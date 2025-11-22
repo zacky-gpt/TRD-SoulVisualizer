@@ -22,13 +22,34 @@
 
     <div id="main-view">
         <div id="axis-panel">
-            <div class="axis-row"><span style="width:20px; color:#88f">C</span><div class="axis-track th-t"><div class="axis-thumb" id="th-t" style="left:50%"></div></div><span style="width:20px; text-align:right; color:#f88">H</span></div>
-            <div class="axis-row"><span style="width:20px; color:#bfb">S</span><div class="axis-track th-d"><div class="axis-thumb" id="th-d" style="left:50%"></div></div><span style="width:20px; text-align:right; color:#a85">D</span></div>
-            <div class="axis-row"><span style="width:20px; color:#8af">F</span><div class="axis-track th-r"><div class="axis-thumb" id="th-r" style="left:50%"></div></div><span style="width:20px; text-align:right; color:#ff3">R</span></div>
+            <div class="axis-group">
+                <div class="axis-labels">
+                    <span style="color:#88f">Cool</span>
+                    <span id="val-t" class="axis-val">50</span>
+                    <span style="color:#f88">Hot</span>
+                </div>
+                <div class="axis-track th-t"><div class="axis-thumb" id="th-t" style="left:50%"></div></div>
+            </div>
+            <div class="axis-group">
+                <div class="axis-labels">
+                    <span style="color:#bfb">Shallow</span>
+                    <span id="val-d" class="axis-val">50</span>
+                    <span style="color:#a85">Deep</span>
+                </div>
+                <div class="axis-track th-d"><div class="axis-thumb" id="th-d" style="left:50%"></div></div>
+            </div>
+            <div class="axis-group">
+                <div class="axis-labels">
+                    <span style="color:#8af">Flex</span>
+                    <span id="val-r" class="axis-val">50</span>
+                    <span style="color:#ff3">Rigid</span>
+                </div>
+                <div class="axis-track th-r"><div class="axis-thumb" id="th-r" style="left:50%"></div></div>
+            </div>
         </div>
         
         <div id="encounter-box"><div id="enc-content"></div></div>
-        <div id="log-list"><div class="l-yel">System: システム分割完了。</div></div>
+        <div id="log-list"><div class="l-yel">System: 3軸数値の可視化、完了。</div></div>
         
         <div id="status-panel">
             <div class="st-row"><span>Lv <span id="pl-lv" style="color:#fff">1</span></span> <span>B<span id="pl-fl">1</span></span></div>
@@ -53,4 +74,3 @@
 <script src="script.js"></script>
 </body>
 </html>
-
