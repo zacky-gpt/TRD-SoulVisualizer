@@ -1,1 +1,699 @@
 
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRD: Debug Tactician</title>
+    <style>
+        /* --- 安全なベーススタイル --- */
+        body {
+            background-color: #000; color: #ccc;
+            font-family: 'Courier New', monospace;
+            margin: 0; padding: 10px;
+            height: 100vh; overflow: hidden; display: flex; flex-direction: column;
+        }
+        /* エラー表示エリア */
+        #error-trap {
+            display: none; background: #500; color: #fff;
+            padding: 10px; border: 2px solid #f00; margin-bottom: 10px;
+            font-weight: bold; white-space: pre-wrap;
+        }
+
+        /* レイアウト枠 */
+        #game-root {
+            flex-grow: 1; display: flex; flex-direction: column;
+            max-width: 600px; margin: 0 auto;
+            border: 1px solid #333; background: #111;
+        }
+
+        /* --- 上部情報 --- */
+        #top-panel { padding: 8px; background: #181818; border-bottom: 1px solid #444; }
+        .bar-row { display: flex; justify-content: space-between; font-size: 0.8em; margin-bottom: 4px; }
+        .life-bg { width: 100%; height: 6px; background: #333; border-radius: 3px;}
+        .life-fill { height: 100%; background: #f33; width: 100%; transition: width 0.3s; border-radius: 3px;}
+
+        /* --- メイン画面 --- */
+        #main-view { flex-grow: 1; overflow-y: auto; padding: 10px; }
+        
+        /* チャート & ステータス */
+        #stats-box { display: flex; gap: 15px; justify-content: center; margin-bottom: 15px; align-items: center; }
+        #radar-wrap {
+            width: 120px; height: 120px; background: #000;
+            border: 1px solid #333; border-radius: 50%;
+            flex-shrink: 0;
+        }
+        #num-stats { font-size: 0.85em; line-height: 1.8; display: grid; grid-template-columns: 1fr 1fr; gap: 0 15px;}
+        .st-lbl { font-weight: bold; margin-right: 5px; }
+
+        /* 遭遇エリア */
+        #encounter-box {
+            min-height: 80px; margin-bottom: 10px; padding: 10px;
+            border: 1px solid #444; border-radius: 4px; text-align: center;
+            background: #000; display: none;
+        }
+        .en-name { font-size: 1.1em; font-weight: bold; display: block; margin-bottom: 5px; }
+        .en-desc { font-size: 0.8em; color: #aaa; }
+
+        /* ログ */
+        #log-list {
+            height: 140px; overflow-y: auto; background: #080808;
+            border: 1px solid #333; padding: 5px; font-size: 0.8em;
+            display: flex; flex-direction: column-reverse;
+        }
+        .l-gry { color: #777; } .l-red { color: #f66; } .l-grn { color: #6f6; }
+        .l-blu { color: #6cf; } .l-yel { color: #ff6; }
+
+        /* --- 下部操作エリア --- */
+        #bottom-panel {
+            background: #1a1a1a; border-top: 1px solid #444;
+            padding: 10px;
+        }
+        /* プレイヤーステータス */
+        #pl-status {
+            display: flex; justify-content: space-around; margin-bottom: 10px;
+            font-weight: bold; font-size: 0.9em; color: #eee;
+            background: #222; padding: 5px; border-radius: 4px;
+        }
+        /* アイテム欄 */
+        #item-belt {
+            display: flex; gap: 5px; margin-bottom: 8px; overflow-x: auto; padding-bottom: 5px;
+        }
+        .item-chip {
+            border: 1px solid #555; background: #222; color: #ccc;
+            padding: 4px 8px; font-size: 0.75em; cursor: pointer; white-space: nowrap; border-radius: 3px;
+        }
+        .item-chip:hover { border-color: #fff; background: #333; }
+        
+        /* コマンドボタン */
+        #cmd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        button {
+            background: #222; color: #eee; border: 1px solid #555;
+            padding: 10px; cursor: pointer; text-align: left; min-height: 60px;
+            display: flex; flex-direction: column; justify-content: center;
+            border-radius: 4px;
+        }
+        button:hover { background: #333; border-color: #999; }
+        button:disabled { opacity: 0.3; filter: grayscale(100%); cursor: not-allowed; }
+
+        .b-name { font-weight: bold; font-size: 0.95em; display: block; }
+        .b-meta { font-size: 0.75em; color: #aaa; display: flex; justify-content: space-between; width: 100%; margin-top: 4px;}
+        .b-pred { color: #fa0; font-weight: bold; }
+
+        /* モーダル */
+        #modal-overlay {
+            display: none; position: fixed; top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.85); z-index: 99;
+        }
+        #modal-win {
+            position: absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+            background: #111; border: 2px solid #ff0; padding: 20px; width: 85%; max-width: 350px;
+            text-align: center;
+        }
+        .m-btn { width: 100%; padding: 12px; margin: 5px 0; background:#333; color:#fff; border:1px solid #666; text-align:left; cursor:pointer;}
+        .m-btn span { float: right; font-size: 0.8em; color: #aaa; }
+
+    </style>
+</head>
+<body>
+
+<div id="error-trap"></div>
+
+<div id="game-root">
+    <div id="top-panel">
+        <div class="bar-row">
+            <span style="color:#f88">LIFE LIMIT</span>
+            <span id="disp-turn">150</span>
+        </div>
+        <div class="life-bg"><div class="life-fill" id="bar-turn"></div></div>
+    </div>
+
+    <div id="main-view">
+        <div id="stats-box">
+            <div id="radar-wrap"><canvas id="radar" width="120" height="120"></canvas></div>
+            <div id="num-stats">
+                <div><span class="st-lbl" style="color:#f88">STR</span> <span id="v-str">0</span></div>
+                <div><span class="st-lbl" style="color:#88f">INT</span> <span id="v-int">0</span></div>
+                <div><span class="st-lbl" style="color:#a85">VIT</span> <span id="v-vit">0</span></div>
+                <div><span class="st-lbl" style="color:#bfb">AGI</span> <span id="v-agi">0</span></div>
+                <div><span class="st-lbl" style="color:#ff3">DEX</span> <span id="v-dex">0</span></div>
+                <div><span class="st-lbl" style="color:#8af">MND</span> <span id="v-mnd">0</span></div>
+            </div>
+        </div>
+
+        <div id="encounter-box">
+            <div id="enc-content"></div>
+        </div>
+
+        <div id="log-list">
+            <div class="l-yel">System: 戦術予測・修復モジュール起動。</div>
+        </div>
+    </div>
+
+    <div id="bottom-panel">
+        <div id="pl-status">
+            <span>Floor <span id="pl-fl" style="color:#fff">1</span></span>
+            <span>HP <span id="pl-hp" style="color:#fa0">20</span>/<span id="pl-mhp">20</span></span>
+            <span>MP <span id="pl-mp" style="color:#8cf">10</span>/<span id="pl-mmp">10</span></span>
+        </div>
+        
+        <div id="item-belt"></div>
+
+        <div id="cmd-grid">
+            <button disabled>Initializing...</button>
+        </div>
+    </div>
+</div>
+
+<div id="modal-overlay">
+    <div id="modal-win">
+        <h3 style="color:#ff0; margin:0 0 10px 0;">LEVEL UP</h3>
+        <p style="font-size:0.8em; color:#ccc;">魂の重心を選択してください</p>
+        <div id="modal-list"></div>
+    </div>
+</div>
+
+<script>
+    // --- 1. エラー監視システム ---
+    window.onerror = function(msg, url, line) {
+        const trap = document.getElementById('error-trap');
+        trap.style.display = 'block';
+        trap.innerText = `ERROR Detected:\n${msg}\nLine: ${line}`;
+        return false; // コンソールにも出す
+    };
+
+    try {
+        // --- 2. 定数・データ定義 ---
+        const CONF = { initTurns: 150, maxFloor: 10 };
+        
+        // 敵データ
+        const ENEMY_TYPES = [
+            { id: 'slime', name: 'Slime', hpMod: 0.8, defMod: 1.5, mDefMod: 0.2, eva: 0, desc: '物理防御高め/魔法弱点' },
+            { id: 'bat', name: 'Bat', hpMod: 0.6, defMod: 0.5, mDefMod: 0.5, eva: 0.30, desc: '高回避/低耐久' },
+            { id: 'golem', name: 'Golem', hpMod: 1.6, defMod: 1.2, mDefMod: 0.8, eva: -0.1, desc: '高耐久/鈍足' },
+            { id: 'ghost', name: 'Ghost', hpMod: 0.7, defMod: 4.0, mDefMod: 0.3, eva: 0.15, desc: '物理無効に近い' }
+        ];
+
+        // アイテムデータ
+        const ITEM_DATA = {
+            potion: { name: "Potion", desc: "HP50回復", type: "heal", val: 50 },
+            ether:  { name: "Ether", desc: "MP20回復", type: "mp", val: 20 },
+            bomb:   { name: "Bomb", desc: "防御無視30dmg", type: "dmg", val: 30 },
+            clock:  { name: "Clock", desc: "寿命+20", type: "turn", val: 20 }
+        };
+
+        // ゲーム状態オブジェクト
+        const g = {
+            state: 'EXPLORE', // EXPLORE, BATTLE, CHEST
+            floor: 1, stairsFound: false,
+            turns: CONF.initTurns, maxTurns: CONF.initTurns,
+            lv: 1, exp: 0, next: 30,
+            hp: 25, mhp: 25, mp: 10, mmp: 10,
+            axis: { T: 50, D: 50, R: 50 },
+            items: { potion: 1, bomb: 0, ether: 0, clock: 0 },
+            enemy: null,
+            chest: null,
+            gameOver: false
+        };
+
+        // --- 3. コア計算ロジック ---
+        function getStats() {
+            const b = 5 + (g.lv * 1.5);
+            const a = g.axis;
+            return {
+                STR: Math.floor(b * (a.T/50)), INT: Math.floor(b * ((100-a.T)/50)),
+                VIT: Math.floor(b * (a.D/50)), AGI: Math.floor(b * ((100-a.D)/50)),
+                DEX: Math.floor(b * (a.R/50)), MND: Math.floor(b * ((100-a.R)/50))
+            };
+        }
+
+        function getSkillDeck() {
+            const t=g.axis.T, d=g.axis.D, r=g.axis.R;
+            const deck = [{id:'atk', name:"Attack", type:"phys", mp:0, pwr:1.0, acc:0.95, desc:"通常攻撃"}];
+            
+            // T軸 (STR vs INT)
+            if(t>60) deck.push({id:'smash', name:"Smash", type:"phys", mp:2, pwr:1.7, acc:0.75, desc:"強打"});
+            else if(t<40) deck.push({id:'ice', name:"IceBolt", type:"mag", mp:4, pwr:1.3, acc:1.0, desc:"氷魔法"});
+            else deck.push({id:'fire', name:"FireBlade", type:"hyb", mp:6, pwr:1.5, acc:0.95, desc:"炎剣"});
+            
+            // D軸 (VIT vs AGI)
+            if(d>60) deck.push({id:'guard', name:"Guard", type:"def", mp:0, pwr:0, acc:1.0, desc:"防御"});
+            else if(d<40) deck.push({id:'trip', name:"Trip", type:"def", mp:3, pwr:0, acc:1.0, desc:"足払"});
+            else deck.push({id:'parry', name:"Parry", type:"buff", mp:5, pwr:0, acc:1.0, desc:"パリィ"}); // 簡易buff扱い
+            
+            // R軸 (DEX vs MND)
+            if(r>60) deck.push({id:'snipe', name:"Snipe", type:"phys", mp:4, pwr:1.1, acc:0.9, desc:"狙撃"});
+            else if(r<40) deck.push({id:'heal', name:"Heal", type:"heal", mp:8, pwr:0, acc:1.0, desc:"回復"});
+            else deck.push({id:'focus', name:"Focus", type:"buff", mp:2, pwr:0, acc:1.0, desc:"集中"});
+            
+            return deck;
+        }
+
+        // ダメージ予測・計算
+        function calcHitRate(acc, type, s) {
+            let rate = acc;
+            if(type === 'phys' || type === 'hyb') rate += (s.DEX * 0.01);
+            if(g.enemy) rate -= g.enemy.eva;
+            return Math.min(1.0, Math.max(0.0, rate));
+        }
+
+        function calcDmg(pwr, type, s) {
+            if(type === 'heal' || type === 'def' || type === 'buff') return { min:0, max:0 };
+            
+            let base = 0;
+            if(type === 'phys') base = s.STR;
+            else if(type === 'mag') base = s.INT;
+            else if(type === 'hyb') base = (s.STR + s.INT) * 0.6;
+            else if(type === 'bomb') return { min:30, max:30 };
+            
+            if(!g.enemy) return { min:0, max:0 };
+
+            // 敵防御
+            let def = 0;
+            if(type === 'phys' || type === 'hyb') def = (g.enemy.lv * 1.5) * g.enemy.defMod;
+            else if(type === 'mag') def = (g.enemy.lv * 1.0) * g.enemy.mDefMod;
+
+            const raw = Math.floor(base * pwr);
+            const net = Math.max(1, raw - Math.floor(def/2));
+            
+            return { min: Math.floor(net*0.9), max: Math.floor(net*1.1) };
+        }
+
+        // --- 4. UI/描画 ---
+        function updateUI() {
+            if(g.gameOver) return;
+            const s = getStats();
+
+            // リソース上限更新と回復
+            const oldMhp=g.mhp, oldMmp=g.mmp;
+            g.mhp = 20 + (g.lv*5) + (s.VIT*3);
+            g.mmp = 10 + (g.lv*2) + (s.INT) + (s.MND*2);
+            if(g.mhp>oldMhp) g.hp += (g.mhp-oldMhp);
+            if(g.mmp>oldMmp) g.mp += (g.mmp-oldMmp);
+            g.hp = Math.min(g.hp, g.mhp);
+            g.mp = Math.min(g.mp, g.mmp);
+
+            // DOM更新
+            document.getElementById('disp-turn').innerText = g.turns;
+            document.getElementById('bar-turn').style.width = Math.max(0, (g.turns/g.maxTurns)*100) + "%";
+
+            ['str','int','vit','agi','dex','mnd'].forEach(k => document.getElementById('v-'+k).innerText = s[k.toUpperCase()]);
+            document.getElementById('pl-fl').innerText = g.floor;
+            document.getElementById('pl-hp').innerText = g.hp;
+            document.getElementById('pl-mhp').innerText = g.mhp;
+            document.getElementById('pl-mp').innerText = g.mp;
+            document.getElementById('pl-mmp').innerText = g.mmp;
+
+            updateEncounter();
+            renderItems();
+            renderCmd(s);
+            drawRadar(s);
+        }
+
+        function updateEncounter() {
+            const box = document.getElementById('encounter-box');
+            const content = document.getElementById('enc-content');
+            
+            if(g.state === 'BATTLE' && g.enemy) {
+                box.style.display = 'block';
+                // 敵によって枠色を変える（CSS未定義だがstyleで直接操作も可）
+                box.style.borderColor = '#666';
+                if(g.enemy.id === 'slime') box.style.borderColor = '#484';
+                if(g.enemy.id === 'ghost') box.style.borderColor = '#468';
+                
+                content.innerHTML = `
+                    <span class="en-name" style="color:#fff">${g.enemy.name} (Lv${g.enemy.lv})</span>
+                    <span class="en-desc">${g.enemy.desc}</span><br>
+                    <div style="margin-top:5px; color:#fa0;">HP: ${g.enemy.hp} / ${g.enemy.mhp}</div>
+                `;
+            } else if(g.state === 'CHEST' && g.chest) {
+                box.style.display = 'block';
+                box.style.borderColor = '#ba0';
+                let info = "未鑑定";
+                if(g.chest.identified) info = g.chest.trap ? "<span style='color:#f66'>罠の気配！</span>" : "<span style='color:#6f6'>安全そうだ</span>";
+                content.innerHTML = `
+                    <span class="en-name" style="color:#fd0">Treasure Chest</span>
+                    <span class="en-desc">Status: ${info}</span>
+                `;
+            } else {
+                box.style.display = 'none';
+            }
+        }
+
+        function renderItems() {
+            const belt = document.getElementById('item-belt');
+            belt.innerHTML = "";
+            for(let k in g.items) {
+                if(g.items[k] > 0) {
+                    const d = document.createElement('div');
+                    d.className = 'item-chip';
+                    d.innerText = `${ITEM_DATA[k].name} x${g.items[k]}`;
+                    d.onclick = () => useItem(k);
+                    belt.appendChild(d);
+                }
+            }
+        }
+
+        function renderCmd(s) {
+            const area = document.getElementById('cmd-grid');
+            area.innerHTML = "";
+
+            if(g.state === 'BATTLE') {
+                const deck = getSkillDeck();
+                deck.forEach(sk => {
+                    const btn = document.createElement('button');
+                    if(g.mp < sk.mp) btn.disabled = true;
+
+                    // 予測
+                    let predHtml = "";
+                    if(sk.type === 'heal') predHtml = `<span class="b-pred">Heal</span>`;
+                    else if(sk.type === 'def' || sk.type === 'buff') predHtml = `<span class="b-pred">-</span>`;
+                    else {
+                        const hit = Math.floor(calcHitRate(sk.acc, sk.type, s)*100);
+                        const d = calcDmg(sk.pwr, sk.type, s);
+                        predHtml = `<span class="b-pred">${hit}% ${d.min}-${d.max}dmg</span>`;
+                    }
+                    
+                    const mpStr = sk.mp > 0 ? `MP${sk.mp}` : "";
+                    btn.innerHTML = `
+                        <span class="b-name">${sk.name} <span style="float:right; font-size:0.8em; color:#8cf">${mpStr}</span></span>
+                        <div class="b-meta"><span>${sk.desc}</span>${predHtml}</div>
+                    `;
+                    btn.onclick = () => actBattle(sk);
+                    area.appendChild(btn);
+                });
+                
+                // 逃走
+                const escRate = Math.floor(Math.min(1, Math.max(0, 0.4 + (s.AGI*0.015) - (g.enemy.lv*0.01))) * 100);
+                const run = document.createElement('button');
+                run.innerHTML = `<span class="b-name">Run</span><div class="b-meta"><span>逃げる</span><span class="b-pred">${escRate}%</span></div>`;
+                run.onclick = actRun;
+                area.appendChild(run);
+
+            } else if(g.state === 'CHEST') {
+                // 宝箱コマンド
+                const intRate = Math.min(95, 30+s.INT*2);
+                const btnI = document.createElement('button');
+                btnI.innerHTML = `<span class="b-name">Inspect (INT)</span><div class="b-meta"><span>罠識別</span><span class="b-pred">${intRate}%</span></div>`;
+                if(g.chest.identified) btnI.disabled = true;
+                btnI.onclick = actInspect;
+                area.appendChild(btnI);
+
+                const dexRate = Math.min(95, 30+s.DEX*2);
+                const btnD = document.createElement('button');
+                btnD.innerHTML = `<span class="b-name">Disarm (DEX)</span><div class="b-meta"><span>解除して開ける</span><span class="b-pred">${dexRate}%</span></div>`;
+                btnD.onclick = actDisarm;
+                area.appendChild(btnD);
+
+                const btnF = document.createElement('button');
+                btnF.innerHTML = `<span class="b-name">Force Open</span><div class="b-meta"><span>無理やり開ける</span><span class="b-pred" style="color:#f66">危険</span></div>`;
+                btnF.onclick = () => actOpen(false);
+                area.appendChild(btnF);
+
+                const btnIg = document.createElement('button');
+                btnIg.innerHTML = `<span class="b-name">Ignore</span><div class="b-meta"><span>立ち去る</span></div>`;
+                btnIg.onclick = () => { g.state='EXPLORE'; g.chest=null; log("無視した。", "l-gry"); updateUI(); };
+                area.appendChild(btnIg);
+
+            } else {
+                // 探索コマンド
+                const btnExp = document.createElement('button');
+                btnExp.innerHTML = `<span class="b-name">Explore</span><div class="b-meta"><span>探索 (-1 Turn)</span></div>`;
+                btnExp.onclick = actExplore;
+                area.appendChild(btnExp);
+
+                if(g.stairsFound) {
+                    const btnDown = document.createElement('button');
+                    btnDown.style.borderColor = "#ff0";
+                    btnDown.innerHTML = `<span class="b-name" style="color:#ff0">Descend</span><div class="b-meta"><span>次の階層へ</span></div>`;
+                    btnDown.onclick = actDescend;
+                    area.appendChild(btnDown);
+                }
+
+                const btnRest = document.createElement('button');
+                btnRest.style.borderColor = "#8cf";
+                btnRest.innerHTML = `<span class="b-name" style="color:#8cf">Rest</span><div class="b-meta"><span>休息 (-5 Turn)</span></div>`;
+                btnRest.onclick = actRest;
+                area.appendChild(btnRest);
+            }
+        }
+
+        // --- 5. アクション ---
+        function log(msg, cls="") {
+            const d = document.createElement('div');
+            d.className = cls; d.innerText = msg;
+            document.getElementById('log-list').prepend(d);
+        }
+
+        function consumeTime(v) {
+            g.turns -= v;
+            if(g.turns <= 0) {
+                g.gameOver = true;
+                log("寿命が尽きた... ゲームオーバー", "l-red");
+                updateUI(); return false;
+            }
+            return true;
+        }
+
+        function actExplore() {
+            if(!consumeTime(1)) return;
+            const r = Math.random();
+            if(r < 0.5) startBattle();
+            else if(r < 0.7) startChest();
+            else if(r < 0.8) {
+                const k=['T','D','R'][Math.floor(Math.random()*3)];
+                const v=Math.random()<.5?10:-10;
+                g.axis[k] = Math.max(0, Math.min(100, g.axis[k]+v));
+                log("磁場異常！性格が変化した！", "l-yel");
+            } else if(r < 0.95) {
+                if(!g.stairsFound) { g.stairsFound=true; log("階段を発見！", "l-grn"); }
+                else { g.exp+=5; log("何もなかった(Exp微増)", "l-gry"); }
+            } else log("静寂...", "l-gry");
+            updateUI();
+        }
+
+        function startBattle() {
+            const lv = g.floor + Math.floor(Math.random()*2);
+            const type = ENEMY_TYPES[Math.floor(Math.random()*ENEMY_TYPES.length)];
+            g.enemy = { ...type, lv:lv, type:type.id,
+                mhp: Math.floor((20+lv*8)*type.hpMod),
+                hp: Math.floor((20+lv*8)*type.hpMod),
+                atk: 5 + lv*2
+            };
+            g.state = 'BATTLE';
+            log(`[遭遇] ${g.enemy.name} Lv${lv} が現れた！`, "l-red");
+        }
+
+        function startChest() {
+            g.state = 'CHEST';
+            g.chest = {
+                trap: Math.random()<0.5,
+                item: Object.keys(ITEM_DATA)[Math.floor(Math.random()*4)],
+                identified: false
+            };
+            log("宝箱を発見！", "l-yel");
+        }
+
+        function actBattle(sk) {
+            if(!consumeTime(1)) return;
+            const s = getStats();
+            g.mp -= sk.mp;
+
+            if(sk.type === 'heal') {
+                const v = 20+s.MND*2; g.hp = Math.min(g.mhp, g.hp+v);
+                log(`HP${v}回復`, "l-grn"); enemyTurn(); updateUI(); return;
+            }
+            if(sk.type === 'def' || sk.type === 'buff') {
+                log(`${sk.name}!`, "l-grn"); enemyTurn(true); updateUI(); return;
+            }
+
+            const hit = calcHitRate(sk.acc, sk.type, s);
+            if(Math.random() > hit) {
+                log("ミス！", "l-gry");
+            } else {
+                const range = calcDmg(sk.pwr, sk.type, s);
+                let dmg = Math.floor(range.min + Math.random()*(range.max-range.min+1));
+                if(sk.id==='snipe' && Math.random()<0.3) { dmg=Math.floor(dmg*1.5); log("クリティカル!", "l-red"); }
+                g.enemy.hp -= dmg;
+                log(`${sk.name}! ${dmg}dmg`, "l-blu");
+            }
+
+            if(g.enemy.hp <= 0) winBattle();
+            else enemyTurn();
+            updateUI();
+        }
+
+        function actRun() {
+            if(!consumeTime(1)) return;
+            const s=getStats();
+            const rate = Math.min(1, Math.max(0, 0.4 + (s.AGI*0.015) - (g.enemy.lv*0.01)));
+            if(Math.random() < rate) {
+                log("逃げ切った！", "l-grn"); g.state='EXPLORE'; g.enemy=null;
+            } else {
+                log("回り込まれた！", "l-red"); enemyTurn();
+            }
+            updateUI();
+        }
+
+        function enemyTurn(guard=false) {
+            if(!g.enemy || g.enemy.hp<=0) return;
+            const s = getStats();
+            if(!guard && Math.random() < s.AGI*0.015) {
+                log("敵の攻撃を回避！", "l-grn"); return;
+            }
+            let dmg = Math.max(1, g.enemy.atk - Math.floor(s.VIT/3));
+            if(guard) dmg = Math.floor(dmg/2);
+            g.hp -= dmg;
+            log(`被弾... ${dmg}dmg`, "l-red");
+            if(g.hp<=0) { g.gameOver=true; log("敗北...", "l-red"); }
+        }
+
+        function winBattle() {
+            const gain = 15 + g.enemy.lv*5;
+            g.exp += gain;
+            log(`勝利！ Exp+${gain}`, "l-grn");
+            g.state='EXPLORE'; g.enemy=null;
+            
+            if(Math.random()<0.3) {
+                const items = Object.keys(ITEM_DATA);
+                const it = items[Math.floor(Math.random()*items.length)];
+                g.items[it]++;
+                log(`${ITEM_DATA[it].name}取得`, "l-yel");
+            }
+
+            if(g.exp >= g.next) {
+                g.exp -= g.next; g.next = Math.floor(g.next*1.4); g.lv++;
+                showLvUp();
+            }
+        }
+
+        // 宝箱アクション
+        function actInspect() {
+            const s = getStats();
+            const rate = (30+s.INT*2)/100;
+            if(Math.random() < rate) {
+                g.chest.identified = true;
+                log("鑑定成功！", "l-blu");
+            } else {
+                log("よく分からなかった...", "l-gry");
+            }
+            updateUI();
+        }
+        function actDisarm() {
+            const s = getStats();
+            const rate = (30+s.DEX*2)/100;
+            if(Math.random() < rate) {
+                log("解除成功！", "l-grn");
+                g.chest.trap = false;
+                actOpen(false);
+            } else {
+                log("解除失敗！罠発動！", "l-red");
+                actOpen(true);
+            }
+        }
+        function actOpen(forceTrap) {
+            if(g.chest.trap || forceTrap) {
+                const dmg = 10 + g.floor*2;
+                g.hp -= dmg;
+                log(`爆発！ ${dmg}dmg`, "l-red");
+                if(g.hp<=0) { g.gameOver=true; updateUI(); return; }
+            }
+            g.items[g.chest.item]++;
+            log(`${ITEM_DATA[g.chest.item].name}を入手！`, "l-yel");
+            g.state='EXPLORE'; g.chest=null;
+            updateUI();
+        }
+
+        // アイテム使用
+        function useItem(k) {
+            if(g.state==='BATTLE' && k!=='bomb' && k!=='potion' && k!=='ether') {
+                log("今は使えない", "l-gry"); return;
+            }
+            if(g.items[k]<=0) return;
+            g.items[k]--;
+            const d=ITEM_DATA[k];
+            if(d.type==='heal') { g.hp=Math.min(g.mhp, g.hp+d.val); log("HP回復", "l-grn"); }
+            if(d.type==='mp') { g.mp=Math.min(g.mmp, g.mp+d.val); log("MP回復", "l-grn"); }
+            if(d.type==='turn') { g.turns+=d.val; log("寿命延長", "l-grn"); }
+            if(d.type==='dmg') {
+                if(g.state!=='BATTLE') { g.items[k]++; return; }
+                g.enemy.hp-=d.val;
+                log(`爆弾！ ${d.val}dmg`, "l-red");
+                if(g.enemy.hp<=0) winBattle(); else enemyTurn();
+            }
+            updateUI();
+        }
+
+        // その他
+        function actRest() {
+            if(!consumeTime(5)) return;
+            const s = getStats();
+            g.hp = Math.min(g.mhp, g.hp + 15 + s.MND*2);
+            g.mp = Math.min(g.mmp, g.mp + 8 + s.MND);
+            log("休息した。", "l-grn");
+            updateUI();
+        }
+        function actDescend() {
+            g.floor++; g.stairsFound=false;
+            if(g.floor>CONF.maxFloor) { g.gameOver=true; log("CLEAR!!", "l-yel"); }
+            else log(`B${g.floor}へ...`, "l-yel");
+            updateUI();
+        }
+        function showLvUp() {
+            document.getElementById('modal-overlay').style.display='block';
+            const l = document.getElementById('modal-list');
+            l.innerHTML = `
+                <button class="m-btn" onclick="mod('T',10)">Hot (STR↑) <span>INT↓</span></button>
+                <button class="m-btn" onclick="mod('T',-10)">Cool (INT↑) <span>STR↓</span></button>
+                <button class="m-btn" onclick="mod('D',10)">Deep (VIT↑) <span>AGI↓</span></button>
+                <button class="m-btn" onclick="mod('D',-10)">Shallow (AGI↑) <span>VIT↓</span></button>
+                <button class="m-btn" onclick="mod('R',10)">Rigid (DEX↑) <span>MND↓</span></button>
+                <button class="m-btn" onclick="mod('R',-10)">Flex (MND↑) <span>DEX↓</span></button>
+            `;
+        }
+        function mod(k,v) {
+            g.axis[k] = Math.max(0, Math.min(100, g.axis[k]+v));
+            document.getElementById('modal-overlay').style.display='none';
+            log("Level Up!", "l-yel"); updateUI();
+        }
+        function drawRadar(s) {
+            const c = document.getElementById('radar'); if(!c) return;
+            const ctx = c.getContext('2d');
+            ctx.clearRect(0,0,120,120);
+            const cx=60, cy=60, r=50;
+            
+            ctx.strokeStyle='#444'; ctx.beginPath();
+            for(let i=0;i<6;i++){
+                const rad=(Math.PI/3)*i-Math.PI/2;
+                ctx.lineTo(cx+r*Math.cos(rad), cy+r*Math.sin(rad));
+            }
+            ctx.closePath(); ctx.stroke();
+
+            if(!s) return;
+            const v=[s.STR, s.DEX, s.AGI, s.MND, s.VIT, s.INT];
+            const max = 10+g.lv*3;
+            
+            ctx.strokeStyle='#0f0'; ctx.fillStyle='rgba(0,255,0,0.3)'; ctx.beginPath();
+            for(let i=0;i<6;i++){
+                let val = Math.min(1.1, Math.max(0.1, v[i]/max));
+                const rad=(Math.PI/3)*i-Math.PI/2;
+                const px=cx+(r*val)*Math.cos(rad), py=cy+(r*val)*Math.sin(rad);
+                if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+            }
+            ctx.closePath(); ctx.fill(); ctx.stroke();
+        }
+
+        // 初期化
+        window.onload = () => {
+            updateUI();
+            log("Welcome.", "l-yel");
+        };
+
+    } catch(e) {
+        const trap = document.getElementById('error-trap');
+        trap.style.display = 'block';
+        trap.innerText = `CRITICAL ERROR:\n${e.message}`;
+    }
+</script>
+</body>
+</html>
