@@ -1,10 +1,7 @@
 // エラーハンドリング
 window.onerror = function(msg, url, line) {
     const el = document.getElementById('error-trap');
-    if(el) { 
-        el.style.display = 'block'; 
-        el.innerText = `ERROR: ${msg} (Line ${line})`; 
-    }
+    if(el) { el.style.display = 'block'; el.innerText = `ERROR: ${msg} (Line ${line})`; }
     return false;
 };
 
@@ -28,7 +25,7 @@ const JOBS = [
     { id:'sentinel', name:'Sentinel', req:{d_min:60, r_max:40}, bonus:{def:0.7, time:1}, desc:"耐-30% 撃破時時+1", priority:2, skill:{name:"Aegis", type:"def", mp:5, pwr:0, acc:1.0, desc:"絶対防御"} },
     { id:'reaper', name:'Reaper', req:{t_max:40, r_min:60}, bonus:{mag:1.1, crit:0.1}, desc:"魔+10% 即死使い", priority:2, skill:{name:"Execution", type:"mag", mp:8, pwr:1.0, acc:0.9, desc:"確率即死", isInstantDeath:true} },
 
-    // High Tier
+    // High Tier (80)
     { id:'samurai', name:'Samurai', req:{t_min:80, r_min:80}, bonus:{phys:1.3, crit:0.2}, desc:"物+30% Crit+20%", priority:3, skill:{name:"Zantetsu", type:"phys", mp:8, pwr:3.0, acc:0.85, desc:"一撃必殺"} },
     { id:'archmage', name:'Archmage', req:{t_max:20, r_max:20}, bonus:{mag:1.3, heal:1.3}, desc:"魔+30% 回+30%", priority:3, skill:{name:"Meteor", type:"mag", mp:12, pwr:3.5, acc:1.0, desc:"隕石召喚"} },
     { id:'ninja', name:'Ninja', req:{d_max:20, r_min:80}, bonus:{eva:0.25, crit:0.2}, desc:"避+25% Crit+20%", priority:3, skill:{name:"Assassinate", type:"phys", mp:8, pwr:2.0, acc:1.0, desc:"即死攻撃", isInstantDeath:true} }
@@ -361,7 +358,7 @@ function actRun() {
     updateUI();
 }
 
-function showLvUp() { document.getElementById('modal-lv').style.display='flex'; document.getElementById('lv-opts').innerHTML = `<button class="m-btn" onclick="mod('T',5)">Hot (STR↑) <span>INT↓</span></button><button class="m-btn" onclick="mod('T',-5)">Cool (INT↑) <span>STR↓</span></button><button class="m-btn" onclick="mod('D',5)">Deep (VIT↑) <span>AGI↓</span></button><button class="m-btn" onclick="mod('D',-5)">Shallow (AGI↑) <span>VIT↓</span></button><button class="m-btn" onclick="mod('R',5)">Rigid (DEX↑) <span>MND↓</span></button><button class="m-btn" onclick="mod('R',-5)">Flex (MND↑) <span>DEX↓</span></button>`; }
+function showLvUp() { document.getElementById('modal-lv').style.display='block'; document.getElementById('lv-opts').innerHTML = `<button class="m-btn" onclick="mod('T',5)">Hot (STR↑) <span>INT↓</span></button><button class="m-btn" onclick="mod('T',-5)">Cool (INT↑) <span>STR↓</span></button><button class="m-btn" onclick="mod('D',5)">Deep (VIT↑) <span>AGI↓</span></button><button class="m-btn" onclick="mod('D',-5)">Shallow (AGI↑) <span>VIT↓</span></button><button class="m-btn" onclick="mod('R',5)">Rigid (DEX↑) <span>MND↓</span></button><button class="m-btn" onclick="mod('R',-5)">Flex (MND↑) <span>DEX↓</span></button>`; }
 function mod(k,v) { g.axis[k] = Math.max(0, Math.min(100, g.axis[k]+v)); document.getElementById('modal-lv').style.display='none'; log("LvUP 完了","l-yel"); updateUI(); }
 
 function updateUI() {
@@ -375,19 +372,20 @@ function updateUI() {
     document.getElementById('job-bonus').innerText = g.currentJob.desc;
     document.getElementById('disp-turn').innerText = g.turns;
     document.getElementById('bar-turn').style.width = Math.max(0, (g.turns/g.maxTurns)*100)+"%";
+    
+    // 軸更新 (HTMLにIDがあるのでエラーにならない)
     document.getElementById('th-t').style.left = g.axis.T+"%"; 
+    document.getElementById('val-t').innerText = g.axis.T;
     document.getElementById('th-d').style.left = g.axis.D+"%"; 
+    document.getElementById('val-d').innerText = g.axis.D;
     document.getElementById('th-r').style.left = g.axis.R+"%"; 
+    document.getElementById('val-r').innerText = g.axis.R;
+    
     document.getElementById('pl-fl').innerText = g.floor;
     document.getElementById('pl-hp').innerText = g.hp; document.getElementById('pl-mhp').innerText = g.mhp;
     document.getElementById('pl-mp').innerText = g.mp; document.getElementById('pl-mmp').innerText = g.mmp;
     document.getElementById('pl-exp').innerText = g.exp; document.getElementById('pl-next').innerText = g.next;
     document.getElementById('pl-lv').innerText = g.lv;
-
-    // 軸数値を更新する処理を追加（重要）
-    document.getElementById('val-t').innerText = g.axis.T;
-    document.getElementById('val-d').innerText = g.axis.D;
-    document.getElementById('val-r').innerText = g.axis.R;
 
     updateEncounter(); renderItems(); renderCmd(s);
 }
@@ -492,11 +490,9 @@ window.showJobGuide = function() {
         const d=document.createElement('div'); d.className="job-row "+(g.currentJob.id===j.id?"active":"");
         let r=[]; if(j.req){ if(j.req.t_min)r.push(`Hot≧${j.req.t_min}`); if(j.req.t_max)r.push(`Cool≧${100-j.req.t_max}`); if(j.req.d_min)r.push(`Deep≧${j.req.d_min}`); if(j.req.d_max)r.push(`Shallow≧${100-j.req.d_max}`); if(j.req.r_min)r.push(`Rigid≧${j.req.r_min}`); if(j.req.r_max)r.push(`Flex≧${100-j.req.r_max}`); }
         d.innerHTML=`<strong style="color:${g.currentJob.id===j.id?'#ff0':'#eee'}">${j.name}</strong> <span class="b-unique" style="font-size:0.7em; padding-left:4px;">${j.skill?j.skill.name:""}</span><span class="job-eff">${j.desc}</span><span style="font-size:0.75em; color:#aaa">条件: ${r.join(' / ')||"なし"}</span>`; l.appendChild(d);
-    }); document.getElementById('modal-job').style.display='flex';
+    }); document.getElementById('modal-job').style.display='block';
 };
 window.closeJobGuide = function(e){ if(e.target.id==='modal-job') e.target.style.display='none'; };
 
 // 起動
 window.onload = () => updateUI();
-
-
