@@ -1,13 +1,16 @@
 // エラーハンドリング
 window.onerror = function(msg, url, line) {
     const el = document.getElementById('error-trap');
-    if(el) { el.style.display = 'block'; el.innerText = `ERROR: ${msg} (Line ${line})`; }
+    if(el) { 
+        el.style.display = 'block'; 
+        el.innerText = `ERROR: ${msg} (Line ${line})`; 
+    }
     return false;
 };
 
 // --- 定数 ---
 const CONF = { initTurns: 150, maxFloor: 10, itemMax: 3 };
-const SAVE_KEY = 'trd_save_data_v9_final';
+const SAVE_KEY = 'trd_save_data_v10_fix'; // Key updated
 
 const JOBS = [
     { id:'novice', name:'Novice', req:null, bonus:{}, desc:"特徴なし" },
@@ -25,7 +28,7 @@ const JOBS = [
     { id:'sentinel', name:'Sentinel', req:{d_min:60, r_max:40}, bonus:{def:0.7, time:1}, desc:"耐-30% 撃破時時+1", priority:2, skill:{name:"Aegis", type:"def", mp:5, pwr:0, acc:1.0, desc:"絶対防御"} },
     { id:'reaper', name:'Reaper', req:{t_max:40, r_min:60}, bonus:{mag:1.1, crit:0.1}, desc:"魔+10% 即死使い", priority:2, skill:{name:"Execution", type:"mag", mp:8, pwr:1.0, acc:0.9, desc:"確率即死", isInstantDeath:true} },
 
-    // High Tier (80)
+    // High Tier
     { id:'samurai', name:'Samurai', req:{t_min:80, r_min:80}, bonus:{phys:1.3, crit:0.2}, desc:"物+30% Crit+20%", priority:3, skill:{name:"Zantetsu", type:"phys", mp:8, pwr:3.0, acc:0.85, desc:"一撃必殺"} },
     { id:'archmage', name:'Archmage', req:{t_max:20, r_max:20}, bonus:{mag:1.3, heal:1.3}, desc:"魔+30% 回+30%", priority:3, skill:{name:"Meteor", type:"mag", mp:12, pwr:3.5, acc:1.0, desc:"隕石召喚"} },
     { id:'ninja', name:'Ninja', req:{d_max:20, r_min:80}, bonus:{eva:0.25, crit:0.2}, desc:"避+25% Crit+20%", priority:3, skill:{name:"Assassinate", type:"phys", mp:8, pwr:2.0, acc:1.0, desc:"即死攻撃", isInstantDeath:true} }
@@ -187,7 +190,16 @@ function actBattle(sk) {
         const v = Math.floor((20*g.currentJob.bonus.heal||20)+s.MND*2); g.hp=Math.min(g.mhp, g.hp+v); log(`HP${v}回復`,"l-grn"); enemyTurn(); updateUI(); return;
     }
     if(sk.id==='trip') {
-        if(Math.random() < 0.8) { g.enemy.isStunned=true; log("足払い成功！","l-grn"); } else log("足払い失敗","l-gry");
+        if(Math.random() < 0.8) { 
+            g.enemy.isStunned=true; 
+            // === HERE IS THE FIX ===
+            if(g.isCharging) {
+                g.isCharging = false;
+                log("足払い成功！ため解除！","l-grn");
+            } else {
+                log("足払い成功！","l-grn");
+            }
+        } else log("足払い失敗","l-gry");
         enemyTurn(); updateUI(); return;
     }
     if(sk.id==='parry') { g.parryActive = true; log("構えた！(Parry)","l-grn"); enemyTurn(); updateUI(); return; }
@@ -373,7 +385,6 @@ function updateUI() {
     document.getElementById('disp-turn').innerText = g.turns;
     document.getElementById('bar-turn').style.width = Math.max(0, (g.turns/g.maxTurns)*100)+"%";
     
-    // 軸更新 (HTMLにIDがあるのでエラーにならない)
     document.getElementById('th-t').style.left = g.axis.T+"%"; 
     document.getElementById('val-t').innerText = g.axis.T;
     document.getElementById('th-d').style.left = g.axis.D+"%"; 
