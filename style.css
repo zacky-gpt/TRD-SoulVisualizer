@@ -1,239 +1,60 @@
-/* --- TRD: Neon Flux Design --- */
+body { background-color: #000; color: #ccc; font-family: 'Courier New', monospace; margin: 0; padding: 5px; min-height: 100vh; display: flex; flex-direction: column; touch-action: manipulation; font-size: 14px; }
+button { cursor: pointer; user-select: none; touch-action: manipulation; }
+#error-trap { display: none; background: #500; color: #fff; padding: 10px; border: 2px solid #f00; font-weight: bold; white-space: pre-wrap; }
+#game-root { flex-grow: 1; display: flex; flex-direction: column; max-width: 600px; margin: 0 auto; border: 1px solid #333; background: #111; padding-bottom: 5px; }
 
-/* ベース設定 */
-body {
-    background-color: #050505;
-    color: #e0e0e0;
-    /* 読みやすいフォントに変更 */
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    margin: 0;
-    padding: 0;
-    min-height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    /* 背景に微かなグリッド線を入れる（雰囲気作り） */
-    background-image: 
-        linear-gradient(rgba(20, 20, 20, 0.5) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(20, 20, 20, 0.5) 1px, transparent 1px);
-    background-size: 20px 20px;
-}
+#header-panel { background: #1a1a1a; border-bottom: 1px solid #444; padding: 5px 10px; }
+#job-banner { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+#job-name { font-size: 1.1em; font-weight: bold; color: #ff0; text-decoration: underline; cursor: pointer; }
+#job-bonus { font-size: 0.75em; color: #8f8; }
+.life-row { display: flex; justify-content: space-between; font-size: 0.7em; color:#f88; margin-bottom:2px; }
+.life-bg { width: 100%; height: 4px; background: #333; }
+.life-fill { height: 100%; background: #f33; width: 100%; transition: width 0.3s; }
 
-button {
-    cursor: pointer;
-    user-select: none;
-    touch-action: manipulation;
-    font-family: inherit;
-}
+#main-view { padding: 5px 10px; }
 
-/* エラー表示 */
-#error-trap {
-    display: none;
-    position: fixed; top: 0; left: 0; width: 100%;
-    background: rgba(100, 0, 0, 0.9);
-    color: #fff;
-    padding: 15px;
-    z-index: 9999;
-    font-weight: bold;
-    white-space: pre-wrap;
-    text-align: center;
-}
+/* 軸パネルのスタイル更新 */
+#axis-panel { margin-bottom: 8px; background: #080808; padding: 5px; border: 1px solid #333; }
+.axis-group { margin-bottom: 5px; }
+.axis-labels { display: flex; justify-content: space-between; align-items: center; font-size: 0.7em; margin-bottom: 2px; }
+.axis-val { font-weight: bold; color: #fff; background: #333; padding: 0 6px; border-radius: 4px; font-size: 0.9em; }
+.axis-track { width: 100%; height: 6px; background: #222; position: relative; overflow:hidden; border-radius:3px; }
+.axis-thumb { width: 8px; height: 100%; background: #fff; position: absolute; transform: translateX(-50%); top:0; }
+.th-t { background: linear-gradient(90deg, #88f, #f88); } 
+.th-d { background: linear-gradient(90deg, #bfb, #a85); } 
+.th-r { background: linear-gradient(90deg, #8af, #ff3); } 
 
-/* ゲーム本体の枠（デバイス風） */
-#game-root {
-    width: 100%;
-    max-width: 500px; /* 少しスリムにしてスマホ感を出す */
-    height: 95vh;     /* 画面いっぱいより少し浮かせる */
-    display: flex;
-    flex-direction: column;
-    background: #111;
-    border: 1px solid #333;
-    border-radius: 12px; /* 角丸 */
-    box-shadow: 0 0 30px rgba(0, 255, 100, 0.05); /* ほのかな発光 */
-    overflow: hidden; /* 角丸からはみ出さないように */
-}
+#encounter-box { min-height: 60px; margin-bottom: 8px; padding: 5px; border: 1px solid #444; text-align: center; background: #000; display: none; border-radius: 4px; }
+.en-name { font-size: 1.0em; font-weight: bold; display: block; }
+.en-desc { font-size: 0.75em; color: #aaa; }
 
-/* --- ヘッダーエリア --- */
-#header-panel {
-    background: linear-gradient(180deg, #1a1a1a, #111);
-    border-bottom: 1px solid #333;
-    padding: 15px 20px;
-    flex-shrink: 0;
-}
+#log-list { height: 100px; overflow-y: auto; background: #080808; border: 1px solid #333; padding: 4px; font-size: 0.75em; display: flex; flex-direction: column-reverse; margin-bottom: 8px; }
+.l-gry { color: #777; } .l-red { color: #f66; } .l-grn { color: #6f6; }
+.l-blu { color: #6cf; } .l-yel { color: #ff6; } .l-dmg { color: #f44; font-weight: bold; background: #200; }
+.l-boss { color: #f80; font-weight: bold; border: 1px solid #f80; background: #310; }
+.l-kill { color: #f0f; font-weight: bold; text-shadow: 0 0 5px #f0f; }
+.l-sys { color: #fff; background: #444; }
 
-#job-banner {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 10px;
-}
+#status-panel { background: #222; padding: 5px; border-radius: 4px; margin-bottom: 8px; font-weight: bold; font-size: 0.85em; color: #eee; }
+.st-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
+#item-belt { display: flex; gap: 4px; margin-bottom: 8px; overflow-x: auto; padding-bottom: 2px; }
+.item-chip { border: 1px solid #555; background: #222; color: #ccc; padding: 4px 8px; font-size: 0.75em; cursor: pointer; white-space: nowrap; border-radius: 3px; }
+.item-chip:hover { border-color: #fff; background: #333; }
 
-#job-name {
-    font-size: 1.4em;
-    font-weight: bold;
-    color: #ffeb3b;
-    text-shadow: 0 0 5px rgba(255, 235, 59, 0.3);
-    text-decoration: none;
-    border-bottom: 1px dashed #555;
-}
+#cmd-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin-bottom: 10px; }
+.cmd-btn { background: #222; color: #eee; border: 1px solid #555; padding: 6px; cursor: pointer; text-align: left; min-height: 50px; display: flex; flex-direction: column; justify-content: center; border-radius: 3px; }
+.cmd-btn:disabled { opacity: 0.3; filter: grayscale(100%); }
+.b-name { font-weight: bold; font-size: 0.8em; display: block; }
+.b-meta { font-size: 0.65em; color: #aaa; display: flex; flex-direction: column; line-height: 1.1; }
+.b-pred { color: #fa0; font-weight: bold; margin-top:1px; }
+.b-unique { border-left: 3px solid #d4d; }
 
-#job-bonus {
-    font-size: 0.85em;
-    color: #81c784;
-}
+#system-footer { border-top: 1px solid #333; padding-top: 5px; display: flex; justify-content: center; gap: 10px; }
+.sys-btn { background: #111; color: #666; border: 1px solid #333; padding: 4px 10px; font-size: 0.7em; cursor: pointer; }
 
-.life-row {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.8em;
-    font-weight: bold;
-    color: #ff8a80;
-    margin-bottom: 4px;
-    letter-spacing: 1px;
-}
-
-.life-bg {
-    width: 100%;
-    height: 8px; /* 太くする */
-    background: #222;
-    border-radius: 4px;
-    border: 1px solid #333;
-    overflow: hidden;
-}
-
-.life-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #d32f2f, #ff5252);
-    width: 100%;
-    transition: width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
-}
-
-/* --- メインビュー --- */
-#main-view {
-    padding: 15px;
-    flex-grow: 1;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 10px; /* 要素間の隙間 */
-}
-
-/* 軸スライダー */
-#axis-panel {
-    background: #0a0a0a;
-    padding: 10px;
-    border: 1px solid #222;
-    border-radius: 8px;
-}
-
-.axis-row {
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.75em;
-    color: #888;
-}
-
-.axis-track {
-    flex: 1;
-    height: 6px;
-    background: #1a1a1a;
-    position: relative;
-    overflow: visible; /* 親指がはみ出てもOKに */
-    border-radius: 3px;
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);
-}
-
-.axis-thumb {
-    width: 12px;
-    height: 12px;
-    background: #eee;
-    border-radius: 50%;
-    position: absolute;
-    transform: translate(-50%, -3px); /* 上下にセンタリング */
-    top: 0;
-    box-shadow: 0 0 5px rgba(255,255,255,0.5);
-    transition: left 0.3s;
-}
-/* トラックの色付け */
-.th-t { background: linear-gradient(90deg, #304ffe, #d50000); } 
-.th-d { background: linear-gradient(90deg, #00c853, #ffab00); } 
-.th-r { background: linear-gradient(90deg, #2962ff, #ffd600); } 
-
-/* 遭遇ボックス */
-#encounter-box {
-    min-height: 70px;
-    padding: 10px;
-    border: 1px solid #333;
-    border-radius: 8px;
-    background: linear-gradient(135deg, #111, #080808);
-    display: none; /* JSで制御 */
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
-}
-
-.en-name { font-size: 1.1em; font-weight: bold; margin-bottom: 4px; letter-spacing: 1px; }
-.en-desc { font-size: 0.8em; color: #aaa; }
-
-/* ログエリア */
-#log-list {
-    height: 120px;
-    overflow-y: auto;
-    background: #050505;
-    border: 1px solid #333;
-    border-radius: 6px;
-    padding: 8px;
-    font-family: 'Courier New', monospace; /* ログだけは等幅フォントで雰囲気出す */
-    font-size: 0.8em;
-    display: flex;
-    flex-direction: column-reverse;
-    box-shadow: inset 0 0 10px #000;
-}
-/* ログの色装飾 */
-.l-gry { color: #666; }
-.l-red { color: #ff5252; }
-.l-grn { color: #69f0ae; }
-.l-blu { color: #40c4ff; }
-.l-yel { color: #ffd740; }
-.l-dmg { color: #ff5252; font-weight: bold; background: rgba(255, 0, 0, 0.1); padding: 2px 4px; border-radius: 2px;}
-.l-boss { color: #ffab00; font-weight: bold; border: 1px solid #ffab00; padding: 4px; text-align: center; margin: 2px 0; background: rgba(255, 171, 0, 0.1); }
-.l-kill { color: #e040fb; font-weight: bold; text-shadow: 0 0 5px #e040fb; }
-.l-sys { color: #aaa; font-style: italic; border-bottom: 1px solid #333; margin-bottom: 2px;}
-
-/* ステータスパネル */
-#status-panel {
-    background: #1a1a1a;
-    padding: 10px;
-    border-radius: 8px;
-    border: 1px solid #333;
-    font-weight: bold;
-    font-size: 0.9em;
-    color: #eee;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-.st-row {
-    display: flex; justify-content: space-between; align-items: center;
-}
-
-/* アイテムベルト */
-#item-belt {
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    padding: 5px 0;
-    /* スクロールバーを隠す */
-    scrollbar-width: none;
-}
-#item-belt::-webkit-scrollbar { display: none; }
-
-.item-chip {
-    background: linear-gradient(to bottom, #333, #222);
-    border: 1px solid #444;
-    color: #ddd;
-    padding: 8px 12px;
-    font
+.modal-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.85); z-index: 99; }
+.modal-win { position: absolute; top:50%; left:50%; transform:translate(-50%,-50%); background: #111; border: 2px solid #ff0; padding: 15px; width: 90%; max-width: 400px; max-height: 85vh; overflow-y: auto; text-align: center; }
+.m-btn { width: 100%; padding: 10px; margin: 4px 0; background:#333; color:#fff; border:1px solid #666; text-align:left; cursor:pointer; }
+.m-btn span { float: right; font-size: 0.8em; color: #aaa; }
+.job-row { text-align: left; border: 1px solid #444; padding: 6px; margin-bottom: 4px; background: #1a1a1a; font-size: 0.8em; }
+.job-row.active { border-color: #ff0; background: #330; }
