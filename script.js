@@ -1,16 +1,12 @@
 // エラーハンドリング
 window.onerror = function(msg, url, line) {
     const el = document.getElementById('error-trap');
-    if(el) { 
-        el.style.display = 'block'; 
-        el.innerText = `ERROR: ${msg} (Line ${line})`; 
-    }
+    if(el) { el.style.display = 'block'; el.innerText = `ERROR: ${msg} (Line ${line})`; }
     return false;
 };
 
-// --- 定数 ---
 const CONF = { initTurns: 150, maxFloor: 10, itemMax: 3 };
-const SAVE_KEY = 'trd_save_data_final';
+const SAVE_KEY = 'trd_save_data_v9_final';
 
 const JOBS = [
     { id:'novice', name:'Novice', req:null, bonus:{}, desc:"特徴なし" },
@@ -20,15 +16,11 @@ const JOBS = [
     { id:'rogue', name:'Rogue', req:{d_max:40}, bonus:{eva:0.2}, desc:"回避+20%", skill:{name:"Mug", type:"phys", mp:4, pwr:1.0, acc:1.0, desc:"攻撃＆強奪"} },
     { id:'sniper', name:'Sniper', req:{r_min:60}, bonus:{crit:0.2}, desc:"Crit+20%", skill:{name:"Headshot", type:"phys", mp:5, pwr:1.5, acc:1.0, desc:"確定クリティカル"} },
     { id:'cleric', name:'Cleric', req:{r_max:40}, bonus:{heal:1.3}, desc:"回復+30%", skill:{name:"Pray", type:"heal", mp:6, pwr:0, acc:1.0, desc:"大回復"} },
-    
-    // Hybrid
     { id:'paladin', name:'Paladin', req:{t_min:60, d_min:60}, bonus:{phys:1.1, def:0.85}, desc:"物+10% 耐-15%", priority:2, skill:{name:"HolyBlade", type:"hyb", mp:6, pwr:2.0, acc:0.95, desc:"聖なる剣"} },
     { id:'assassin', name:'Assassin', req:{t_min:60, d_max:40}, bonus:{phys:1.1, crit:0.1}, desc:"物+10% Crit+10%", priority:2, skill:{name:"Backstab", type:"phys", mp:5, pwr:1.8, acc:1.0, desc:"必中・高威力"} },
     { id:'sage', name:'Sage', req:{t_max:40, r_max:40}, bonus:{mag:1.1, heal:1.2}, desc:"魔+10% 回+20%", priority:2, skill:{name:"BigBang", type:"mag", mp:10, pwr:2.5, acc:1.0, desc:"究極魔法"} },
     { id:'sentinel', name:'Sentinel', req:{d_min:60, r_max:40}, bonus:{def:0.7, time:1}, desc:"耐-30% 撃破時時+1", priority:2, skill:{name:"Aegis", type:"def", mp:5, pwr:0, acc:1.0, desc:"絶対防御"} },
     { id:'reaper', name:'Reaper', req:{t_max:40, r_min:60}, bonus:{mag:1.1, crit:0.1}, desc:"魔+10% 即死使い", priority:2, skill:{name:"Execution", type:"mag", mp:8, pwr:1.0, acc:0.9, desc:"確率即死", isInstantDeath:true} },
-
-    // High Tier
     { id:'samurai', name:'Samurai', req:{t_min:80, r_min:80}, bonus:{phys:1.3, crit:0.2}, desc:"物+30% Crit+20%", priority:3, skill:{name:"Zantetsu", type:"phys", mp:8, pwr:3.0, acc:0.85, desc:"一撃必殺"} },
     { id:'archmage', name:'Archmage', req:{t_max:20, r_max:20}, bonus:{mag:1.3, heal:1.3}, desc:"魔+30% 回+30%", priority:3, skill:{name:"Meteor", type:"mag", mp:12, pwr:3.5, acc:1.0, desc:"隕石召喚"} },
     { id:'ninja', name:'Ninja', req:{d_max:20, r_min:80}, bonus:{eva:0.25, crit:0.2}, desc:"避+25% Crit+20%", priority:3, skill:{name:"Assassinate", type:"phys", mp:8, pwr:2.0, acc:1.0, desc:"即死攻撃", isInstantDeath:true} }
@@ -62,8 +54,6 @@ const INITIAL_G = {
 
 let g = JSON.parse(JSON.stringify(INITIAL_G));
 g.currentJob = JOBS[0];
-
-// --- Global Functions ---
 
 function saveGame() {
     if(g.gameOver) return;
@@ -374,9 +364,9 @@ function updateUI() {
     document.getElementById('job-bonus').innerText = g.currentJob.desc;
     document.getElementById('disp-turn').innerText = g.turns;
     document.getElementById('bar-turn').style.width = Math.max(0, (g.turns/g.maxTurns)*100)+"%";
-    document.getElementById('th-t').style.left = g.axis.T+"%"; 
-    document.getElementById('th-d').style.left = g.axis.D+"%"; 
-    document.getElementById('th-r').style.left = g.axis.R+"%"; 
+    document.getElementById('th-t').style.left = g.axis.T+"%"; document.getElementById('val-t').innerText = g.axis.T;
+    document.getElementById('th-d').style.left = g.axis.D+"%"; document.getElementById('val-d').innerText = g.axis.D;
+    document.getElementById('th-r').style.left = g.axis.R+"%"; document.getElementById('val-r').innerText = g.axis.R;
     document.getElementById('pl-fl').innerText = g.floor;
     document.getElementById('pl-hp').innerText = g.hp; document.getElementById('pl-mhp').innerText = g.mhp;
     document.getElementById('pl-mp').innerText = g.mp; document.getElementById('pl-mmp').innerText = g.mmp;
@@ -492,4 +482,4 @@ window.closeJobGuide = function(e){ if(e.target.id==='modal-job') e.target.style
 
 // 起動
 window.onload = () => updateUI();
-
+</script>
