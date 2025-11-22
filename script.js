@@ -482,4 +482,4 @@ window.closeJobGuide = function(e){ if(e.target.id==='modal-job') e.target.style
 
 // 起動
 window.onload = () => updateUI();
-</script>
+
