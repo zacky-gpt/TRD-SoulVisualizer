@@ -1,60 +1,323 @@
-body { background-color: #000; color: #ccc; font-family: 'Courier New', monospace; margin: 0; padding: 5px; min-height: 100vh; display: flex; flex-direction: column; touch-action: manipulation; font-size: 14px; }
-button { cursor: pointer; user-select: none; touch-action: manipulation; }
-#error-trap { display: none; background: #500; color: #fff; padding: 10px; border: 2px solid #f00; font-weight: bold; white-space: pre-wrap; }
-#game-root { flex-grow: 1; display: flex; flex-direction: column; max-width: 600px; margin: 0 auto; border: 1px solid #333; background: #111; padding-bottom: 5px; }
+/* --- TRD: Solid Console Style (Large Text) --- */
 
-#header-panel { background: #1a1a1a; border-bottom: 1px solid #444; padding: 5px 10px; }
-#job-banner { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-#job-name { font-size: 1.1em; font-weight: bold; color: #ff0; text-decoration: underline; cursor: pointer; }
-#job-bonus { font-size: 0.75em; color: #8f8; }
-.life-row { display: flex; justify-content: space-between; font-size: 0.7em; color:#f88; margin-bottom:2px; }
-.life-bg { width: 100%; height: 4px; background: #333; }
-.life-fill { height: 100%; background: #f33; width: 100%; transition: width 0.3s; }
+/* ベース設定 */
+body {
+    background-color: #000;
+    color: #ddd;
+    /* 硬派な等幅フォント */
+    font-family: 'Courier New', monospace;
+    margin: 0;
+    padding: 10px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    touch-action: manipulation;
+    /* 文字サイズを全体的に大きく */
+    font-size: 16px;
+    line-height: 1.4;
+}
 
-#main-view { padding: 5px 10px; }
+button {
+    cursor: pointer;
+    user-select: none;
+    touch-action: manipulation;
+    font-family: inherit;
+    font-size: 1rem; /* 本文と同じサイズ */
+}
 
-/* 軸パネルのスタイル更新 */
-#axis-panel { margin-bottom: 8px; background: #080808; padding: 5px; border: 1px solid #333; }
-.axis-group { margin-bottom: 5px; }
-.axis-labels { display: flex; justify-content: space-between; align-items: center; font-size: 0.7em; margin-bottom: 2px; }
-.axis-val { font-weight: bold; color: #fff; background: #333; padding: 0 6px; border-radius: 4px; font-size: 0.9em; }
-.axis-track { width: 100%; height: 6px; background: #222; position: relative; overflow:hidden; border-radius:3px; }
-.axis-thumb { width: 8px; height: 100%; background: #fff; position: absolute; transform: translateX(-50%); top:0; }
-.th-t { background: linear-gradient(90deg, #88f, #f88); } 
-.th-d { background: linear-gradient(90deg, #bfb, #a85); } 
-.th-r { background: linear-gradient(90deg, #8af, #ff3); } 
+/* エラー表示 */
+#error-trap {
+    display: none;
+    background: #500;
+    color: #fff;
+    padding: 15px;
+    border: 2px solid #f00;
+    font-weight: bold;
+    white-space: pre-wrap;
+    margin-bottom: 10px;
+}
 
-#encounter-box { min-height: 60px; margin-bottom: 8px; padding: 5px; border: 1px solid #444; text-align: center; background: #000; display: none; border-radius: 4px; }
-.en-name { font-size: 1.0em; font-weight: bold; display: block; }
-.en-desc { font-size: 0.75em; color: #aaa; }
+/* ゲーム全体の枠 */
+#game-root {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    max-width: 640px; /* 少し幅広に */
+    margin: 0 auto;
+    border: 2px solid #444;
+    background: #111;
+    padding-bottom: 10px;
+}
 
-#log-list { height: 100px; overflow-y: auto; background: #080808; border: 1px solid #333; padding: 4px; font-size: 0.75em; display: flex; flex-direction: column-reverse; margin-bottom: 8px; }
-.l-gry { color: #777; } .l-red { color: #f66; } .l-grn { color: #6f6; }
-.l-blu { color: #6cf; } .l-yel { color: #ff6; } .l-dmg { color: #f44; font-weight: bold; background: #200; }
-.l-boss { color: #f80; font-weight: bold; border: 1px solid #f80; background: #310; }
-.l-kill { color: #f0f; font-weight: bold; text-shadow: 0 0 5px #f0f; }
-.l-sys { color: #fff; background: #444; }
+/* --- ヘッダー --- */
+#header-panel {
+    background: #222;
+    border-bottom: 2px solid #444;
+    padding: 15px;
+}
 
-#status-panel { background: #222; padding: 5px; border-radius: 4px; margin-bottom: 8px; font-weight: bold; font-size: 0.85em; color: #eee; }
-.st-row { display: flex; justify-content: space-between; margin-bottom: 2px; }
-#item-belt { display: flex; gap: 4px; margin-bottom: 8px; overflow-x: auto; padding-bottom: 2px; }
-.item-chip { border: 1px solid #555; background: #222; color: #ccc; padding: 4px 8px; font-size: 0.75em; cursor: pointer; white-space: nowrap; border-radius: 3px; }
-.item-chip:hover { border-color: #fff; background: #333; }
+#job-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
 
-#cmd-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin-bottom: 10px; }
-.cmd-btn { background: #222; color: #eee; border: 1px solid #555; padding: 6px; cursor: pointer; text-align: left; min-height: 50px; display: flex; flex-direction: column; justify-content: center; border-radius: 3px; }
+#job-name {
+    font-size: 1.4em; /* 大きく */
+    font-weight: bold;
+    color: #ff0;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+#job-bonus {
+    font-size: 0.9em;
+    color: #8f8;
+}
+
+.life-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9em;
+    color: #f88;
+    margin-bottom: 4px;
+    font-weight: bold;
+}
+
+.life-bg {
+    width: 100%;
+    height: 10px; /* 太く */
+    background: #333;
+    border: 1px solid #555;
+}
+
+.life-fill {
+    height: 100%;
+    background: #f33;
+    width: 100%;
+    transition: width 0.3s;
+}
+
+/* --- メインエリア --- */
+#main-view {
+    padding: 15px;
+}
+
+/* 軸パネル */
+#axis-panel {
+    margin-bottom: 15px;
+    background: #050505;
+    padding: 10px;
+    border: 1px solid #333;
+}
+
+.axis-group {
+    margin-bottom: 12px;
+}
+
+.axis-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85em;
+    color: #aaa;
+    margin-bottom: 4px;
+}
+.axis-val {
+    font-weight: bold;
+    color: #fff;
+    background: #333;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.axis-track {
+    width: 100%;
+    height: 10px; /* 太く */
+    background: #222;
+    position: relative;
+    overflow: hidden;
+    border-radius: 5px;
+    border: 1px solid #444;
+}
+
+.axis-thumb {
+    width: 14px;
+    height: 100%;
+    background: #fff;
+    position: absolute;
+    transform: translateX(-50%);
+    top: 0;
+}
+.th-t { background: linear-gradient(90deg, #44f, #f44); } 
+.th-d { background: linear-gradient(90deg, #4f4, #a84); } 
+.th-r { background: linear-gradient(90deg, #4af, #ff4); } 
+
+/* 遭遇ボックス */
+#encounter-box {
+    min-height: 80px;
+    margin-bottom: 15px;
+    padding: 10px;
+    border: 2px solid #555;
+    text-align: center;
+    background: #000;
+    display: none;
+    border-radius: 6px;
+}
+.en-name { font-size: 1.3em; font-weight: bold; display: block; margin-bottom: 5px; }
+.en-desc { font-size: 0.9em; color: #aaa; }
+
+/* ログエリア */
+#log-list {
+    height: 180px; /* 高さを確保 */
+    overflow-y: auto;
+    background: #050505;
+    border: 1px solid #444;
+    padding: 10px;
+    font-size: 0.95em; /* 読みやすく */
+    display: flex;
+    flex-direction: column-reverse;
+    margin-bottom: 15px;
+    line-height: 1.4;
+}
+.l-gry { color: #888; }
+.l-red { color: #f66; }
+.l-grn { color: #6f6; }
+.l-blu { color: #6cf; }
+.l-yel { color: #ff6; }
+.l-dmg { color: #f44; font-weight: bold; background: #211; padding: 0 4px; }
+.l-boss { color: #f80; font-weight: bold; border: 1px solid #f80; background: #310; padding: 4px; display:block; text-align:center;}
+.l-kill { color: #f0f; font-weight: bold; }
+.l-sys { color: #fff; background: #333; border-left: 4px solid #888; padding-left: 5px; }
+
+/* ステータスパネル */
+#status-panel {
+    background: #222;
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    font-weight: bold;
+    font-size: 1.0em;
+    color: #eee;
+    border: 1px solid #444;
+}
+.st-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+}
+
+/* アイテム */
+#item-belt {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 15px;
+    overflow-x: auto;
+    padding-bottom: 5px;
+}
+.item-chip {
+    border: 1px solid #666;
+    background: #333;
+    color: #eee;
+    padding: 8px 12px;
+    font-size: 0.9em;
+    cursor: pointer;
+    white-space: nowrap;
+    border-radius: 4px;
+}
+.item-chip:hover { border-color: #fff; background: #444; }
+
+/* コマンドボタン */
+#cmd-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr; /* 3列 */
+    gap: 8px;
+    margin-bottom: 15px;
+}
+.cmd-btn {
+    background: #222;
+    color: #eee;
+    border: 1px solid #555;
+    padding: 10px 5px;
+    cursor: pointer;
+    text-align: center; /* 中央揃え */
+    min-height: 70px; /* 大きく */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border-radius: 6px;
+}
+.cmd-btn:active { background: #444; }
 .cmd-btn:disabled { opacity: 0.3; filter: grayscale(100%); }
-.b-name { font-weight: bold; font-size: 0.8em; display: block; }
-.b-meta { font-size: 0.65em; color: #aaa; display: flex; flex-direction: column; line-height: 1.1; }
-.b-pred { color: #fa0; font-weight: bold; margin-top:1px; }
-.b-unique { border-left: 3px solid #d4d; }
 
-#system-footer { border-top: 1px solid #333; padding-top: 5px; display: flex; justify-content: center; gap: 10px; }
-.sys-btn { background: #111; color: #666; border: 1px solid #333; padding: 4px 10px; font-size: 0.7em; cursor: pointer; }
+.b-name {
+    font-weight: bold;
+    font-size: 1.0em; /* スキル名大きく */
+    display: block;
+    margin-bottom: 4px;
+}
+.b-meta {
+    font-size: 0.75em;
+    color: #aaa;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+}
+.b-pred {
+    color: #fa0;
+    font-weight: bold;
+    margin-top: 2px;
+    font-size: 0.85em;
+}
+.b-unique { border: 1px solid #d4d; background: #202; }
 
-.modal-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.85); z-index: 99; }
-.modal-win { position: absolute; top:50%; left:50%; transform:translate(-50%,-50%); background: #111; border: 2px solid #ff0; padding: 15px; width: 90%; max-width: 400px; max-height: 85vh; overflow-y: auto; text-align: center; }
-.m-btn { width: 100%; padding: 10px; margin: 4px 0; background:#333; color:#fff; border:1px solid #666; text-align:left; cursor:pointer; }
-.m-btn span { float: right; font-size: 0.8em; color: #aaa; }
-.job-row { text-align: left; border: 1px solid #444; padding: 6px; margin-bottom: 4px; background: #1a1a1a; font-size: 0.8em; }
-.job-row.active { border-color: #ff0; background: #330; }
+/* システムメニュー */
+#system-footer {
+    border-top: 2px solid #333;
+    padding-top: 15px;
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+}
+.sys-btn {
+    background: #111;
+    color: #888;
+    border: 1px solid #444;
+    padding: 10px 20px;
+    font-size: 0.9em;
+    border-radius: 4px;
+}
+.sys-btn:hover { background: #333; color: #fff; border-color: #fff; }
+
+/* モーダル */
+.modal-overlay {
+    display: none;
+    position: fixed; top:0; left:0; width:100%; height:100%;
+    background: rgba(0,0,0,0.9);
+    z-index: 99;
+}
+.modal-win {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: #111;
+    border: 2px solid #ff0;
+    padding: 20px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    text-align: center;
+}
+.m-btn {
+    width: 100%;
+    padding: 15px;
+    margin: 8px 0;
+    background: #222;
+    color: #fff;
+    border: 1px solid #555;
+    text-align: left;
+    font-size: 1.0em;
+}
+.m-btn span { float: right; color: #aaa; }
