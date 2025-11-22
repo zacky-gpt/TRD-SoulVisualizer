@@ -13,7 +13,6 @@ button { cursor: pointer; user-select: none; touch-action: manipulation; font-fa
 
 #main-view { padding: 10px 15px; }
 
-/* 軸パネル（修正） */
 #axis-panel { margin-bottom: 12px; background: #050505; padding: 8px; border: 1px solid #333; }
 .axis-group { margin-bottom: 8px; }
 .axis-labels { display: flex; justify-content: space-between; align-items: center; font-size: 0.75em; color: #aaa; margin-bottom: 3px; }
@@ -51,6 +50,7 @@ button { cursor: pointer; user-select: none; touch-action: manipulation; font-fa
 .b-name { font-weight: bold; font-size: 0.85em; display: block; margin-bottom: 2px; }
 .b-meta { font-size: 0.7em; color: #aaa; display: flex; flex-direction: column; line-height: 1.1; }
 .b-pred { color: #fa0; font-weight: bold; margin-top: 1px; font-size: 0.8em; }
+.b-cd { color: #f44; font-weight: bold; font-size: 0.8em; margin-top:1px; } /* クールタイム表示 */
 .b-unique { border: 1px solid #d4d; background: #202; }
 
 #system-footer { border-top: 1px solid #333; padding-top: 10px; display: flex; justify-content: center; gap: 15px; }
@@ -59,14 +59,7 @@ button { cursor: pointer; user-select: none; touch-action: manipulation; font-fa
 
 .modal-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.9); z-index: 99; }
 .modal-win { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #111; border: 2px solid #ff0; padding: 15px; width: 90%; max-width: 450px; max-height: 90vh; overflow-y: auto; text-align: center; }
-
-/* モーダル内ボタン (リッチ化) */
-.m-btn { 
-    width: 100%; padding: 15px; margin: 6px 0; 
-    background: linear-gradient(90deg, #222, #151515); 
-    color: #fff; border: 1px solid #555; border-left: 5px solid #ff0;
-    text-align: left; font-size: 1.0em; font-weight: bold; border-radius: 4px;
-}
+.m-btn { width: 100%; padding: 15px; margin: 6px 0; background: linear-gradient(90deg, #222, #151515); color: #fff; border: 1px solid #555; border-left: 5px solid #ff0; text-align: left; font-size: 1.0em; font-weight: bold; border-radius: 4px; }
 .m-btn:hover { background: #333; border-color: #fff; }
 .m-btn span { float: right; color: #f66; font-weight: normal; font-size: 0.85em; background: rgba(0,0,0,0.5); padding: 2px 4px; border-radius: 2px; }
 
