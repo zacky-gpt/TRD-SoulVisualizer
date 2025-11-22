@@ -333,4 +333,165 @@ function actOpen(f) {
 function useItem(k) {
     if(g.gameOver) return;
     if(k==='bomb' && (!g.enemy||g.state!=='BATTLE')) { log("敵がいない","l-gry"); return; }
-    if(g.state==='BATTLE' && !['bomb','potion','ether'].includes(k)) { log("
+    if(g.state==='BATTLE' && !['bomb','potion','ether'].includes(k)) { log("不可","l-gry"); return; }
+    if(g.items[k]<=0) return;
+    g.items[k]--; const d=ITEM_DATA[k];
+    if(d.type==='heal') { g.hp=Math.min(g.mhp, g.hp+d.val); log("HP回復","l-grn"); }
+    if(d.type==='mp') { g.mp=Math.min(g.mmp, g.mp+d.val); log("MP回復","l-grn"); }
+    if(d.type==='turn') { g.turns+=d.val; log("寿命延長","l-grn"); }
+    if(d.type==='dmg') { g.enemy.hp-=d.val; log(`爆弾 ${d.val}dmg`,"l-blu"); if(g.enemy.hp<=0) winBattle(); else enemyTurn(); }
+    updateUI();
+}
+function actRest() { if(g.gameOver||!consumeTime(2)) return; const s=getStats(); g.hp=Math.min(g.mhp, g.hp+15+s.MND*2); g.mp=Math.min(g.mmp, g.mp+8+s.MND); log("休息","l-grn"); saveGame(); updateUI(); }
+function actDescend() {
+    if(g.gameOver) return;
+    if(g.floor===5) { startBattle({ ...BOSSES[5], lv:5, isBoss:true, mhp:BOSSES[5].hp }); return; }
+    g.floor++; g.stairsFound=false; g.searchCount=0;
+    log("全回復！","l-grn"); g.hp=g.mhp; g.mp=g.mmp;
+    if(g.floor===10) log("最深部...","l-boss"); else log(`B${g.floor}へ`,"l-yel");
+    saveGame(); updateUI();
+}
+function actChallengeBoss() { startBattle({ ...BOSSES[10], lv:10, isBoss:true, mhp:BOSSES[10].hp }); }
+function actRun() {
+    if(g.gameOver||!consumeTime(1)) return; const s=getStats();
+    let r = 0.4+(s.AGI*0.015)-(g.enemy.lv*0.01); if(g.currentJob.bonus.eva) r+=g.currentJob.bonus.eva;
+    if(g.enemy.isBoss) r=0;
+    if(Math.random()<r) { log("逃走成功","l-grn"); g.state='EXPLORE'; g.enemy=null; } else { log("失敗","l-red"); enemyTurn(); }
+    updateUI();
+}
+
+function showLvUp() { document.getElementById('modal-lv').style.display='block'; document.getElementById('lv-opts').innerHTML = `<button class="m-btn" onclick="mod('T',5)">Hot (STR↑) <span>INT↓</span></button><button class="m-btn" onclick="mod('T',-5)">Cool (INT↑) <span>STR↓</span></button><button class="m-btn" onclick="mod('D',5)">Deep (VIT↑) <span>AGI↓</span></button><button class="m-btn" onclick="mod('D',-5)">Shallow (AGI↑) <span>VIT↓</span></button><button class="m-btn" onclick="mod('R',5)">Rigid (DEX↑) <span>MND↓</span></button><button class="m-btn" onclick="mod('R',-5)">Flex (MND↑) <span>DEX↓</span></button>`; }
+function mod(k,v) { g.axis[k] = Math.max(0, Math.min(100, g.axis[k]+v)); document.getElementById('modal-lv').style.display='none'; log("LvUP 完了","l-yel"); updateUI(); }
+
+function updateUI() {
+    updateJob(); const s = getStats();
+    const oldMhp=g.mhp, oldMmp=g.mmp;
+    g.mhp = 20 + (g.lv*5) + (s.VIT*3); g.mmp = 10 + (g.lv*2) + (s.INT) + (s.MND*2);
+    if(g.mhp>oldMhp) g.hp += (g.mhp-oldMhp); if(g.mmp>oldMmp) g.mp += (g.mmp-oldMmp);
+    g.hp=Math.min(g.hp, g.mhp); g.mp=Math.min(g.mp, g.mmp);
+
+    document.getElementById('job-name').innerText = g.currentJob.name;
+    document.getElementById('job-bonus').innerText = g.currentJob.desc;
+    document.getElementById('disp-turn').innerText = g.turns;
+    document.getElementById('bar-turn').style.width = Math.max(0, (g.turns/g.maxTurns)*100)+"%";
+    document.getElementById('th-t').style.left = g.axis.T+"%"; 
+    document.getElementById('th-d').style.left = g.axis.D+"%"; 
+    document.getElementById('th-r').style.left = g.axis.R+"%"; 
+    document.getElementById('pl-fl').innerText = g.floor;
+    document.getElementById('pl-hp').innerText = g.hp; document.getElementById('pl-mhp').innerText = g.mhp;
+    document.getElementById('pl-mp').innerText = g.mp; document.getElementById('pl-mmp').innerText = g.mmp;
+    document.getElementById('pl-exp').innerText = g.exp; document.getElementById('pl-next').innerText = g.next;
+    document.getElementById('pl-lv').innerText = g.lv;
+
+    updateEncounter(); renderItems(); renderCmd(s);
+}
+
+function updateEncounter() {
+    const b = document.getElementById('encounter-box'); const c = document.getElementById('enc-content');
+    if(g.state==='BATTLE' && g.enemy) {
+        b.style.display='block'; 
+        if(g.enemy.isBoss) b.style.borderColor='#f80';
+        else b.style.borderColor = g.enemy.id==='slime'?'#484':(g.enemy.id==='ghost'?'#468':'#666');
+        c.innerHTML = `<span class="en-name" style="color:#fff">${g.enemy.name} (Lv${g.enemy.lv})</span><span class="en-desc">${g.enemy.desc}</span><br><div style="margin-top:2px; color:#fa0;">HP: ${g.enemy.hp} / ${g.enemy.mhp}</div>`;
+    } else if(g.state==='CHEST' && g.chest) {
+        b.style.display='block'; b.style.borderColor='#ba0';
+        let i = g.chest.identified ? (g.chest.trap?"<span style='color:#f66'>罠あり</span>":"<span style='color:#6f6'>安全</span>") : "未鑑定";
+        c.innerHTML = `<span class="en-name" style="color:#fd0">Treasure Chest</span><span class="en-desc">状態: ${i}</span>`;
+    } else { b.style.display='none'; }
+}
+
+function renderItems() {
+    const b = document.getElementById('item-belt'); b.innerHTML = "";
+    for(let k in g.items) {
+        if(g.items[k]>0) {
+            const d = document.createElement('div'); d.className='item-chip';
+            d.innerText = `${ITEM_DATA[k].name} x${g.items[k]}`; d.onclick=()=>useItem(k);
+            b.appendChild(d);
+        }
+    }
+}
+
+function renderCmd(s) {
+    const area = document.getElementById('cmd-grid'); area.innerHTML = "";
+    if(g.gameOver) { area.innerHTML = `<button class="cmd-btn" onclick="location.reload()" style="grid-column:1/-1; border-color:#f55; color:#f55;"><span class="b-name">GAME OVER</span><div class="b-meta"><span>RELOAD TO RETRY</span></div></button>`; return; }
+    
+    if(g.state==='BATTLE') {
+        getDeck().forEach(sk => {
+            const btn = document.createElement('button'); btn.className = "cmd-btn";
+            if(g.mp < sk.mp) btn.disabled = true;
+            let pred = "";
+            if(sk.type==='heal') pred = `<span class="b-pred">Heal</span>`;
+            else if(sk.type==='def'||sk.type==='buff') pred = `<span class="b-pred">-</span>`;
+            else {
+                const hit = Math.floor(calcHit(sk.acc, sk.type, s, sk.cap)*100);
+                const d = calcDmg(sk.pwr, sk.type, s);
+                pred = `<span class="b-pred">${Math.floor(hit*100)}% ${d.min}-${d.max}</span>`;
+            }
+            const mpStr = sk.mp>0 ? `MP${sk.mp}` : "";
+            btn.innerHTML = `<span class="b-name">${sk.name} <span style="float:right; font-size:0.9em; color:#8cf">${mpStr}</span></span><div class="b-meta"><span>${sk.desc}</span>${pred}</div>`;
+            if(sk.id === g.currentJob.skill?.id) { btn.classList.add('b-unique'); }
+            btn.onclick = () => actBattle(sk);
+            area.appendChild(btn);
+        });
+        const rate = Math.floor(Math.min(1,Math.max(0, 0.4+(s.AGI*0.015)-(g.enemy.lv*0.01) + (g.currentJob.bonus.eva||0)))*100);
+        const run = document.createElement('button'); run.className = "cmd-btn";
+        run.disabled = !!g.enemy.isBoss;
+        run.innerHTML = `<span class="b-name">Run</span><div class="b-meta"><span>逃走</span><span class="b-pred">${g.enemy.isBoss?'0':rate}%</span></div>`;
+        run.onclick = actRun; area.appendChild(run);
+    } else if(g.state==='CHEST') {
+        const iR = Math.min(95, 30+s.INT*2);
+        const btnI = document.createElement('button'); btnI.className="cmd-btn";
+        btnI.innerHTML = `<span class="b-name">Inspect (MP2)</span><div class="b-meta"><span>INT:鑑定</span><span class="b-pred">${iR}%</span></div>`;
+        if(g.chest.inspected || g.mp<2) btnI.disabled=true; btnI.onclick=actInspect; area.appendChild(btnI);
+
+        const dR = Math.min(95, 30+s.DEX*2);
+        const btnD = document.createElement('button'); btnD.className="cmd-btn";
+        btnD.innerHTML = `<span class="b-name">Disarm (MP3)</span><div class="b-meta"><span>DEX:解除</span><span class="b-pred">${dR}%</span></div>`;
+        if(g.mp<3) btnD.disabled=true; btnD.onclick=actDisarm; area.appendChild(btnD);
+
+        const btnF = document.createElement('button'); btnF.className="cmd-btn";
+        btnF.innerHTML = `<span class="b-name">Force Open</span><div class="b-meta"><span>強引に</span><span class="b-pred" style="color:#f66">危険</span></div>`;
+        btnF.onclick=()=>actOpen(false); area.appendChild(btnF);
+
+        const btnIg = document.createElement('button'); btnIg.className="cmd-btn";
+        btnIg.innerHTML = `<span class="b-name">Ignore</span><div class="b-meta"><span>無視</span></div>`;
+        btnIg.onclick=()=>{g.state='EXPLORE'; g.chest=null; log("無視した。"); updateUI();}
+        area.appendChild(btnIg);
+    } else {
+        const btnE = document.createElement('button'); btnE.className="cmd-btn";
+        btnE.innerHTML = `<span class="b-name">Explore</span><div class="b-meta"><span>探索 (-1 Turn)</span></div>`;
+        btnE.onclick = actExplore; area.appendChild(btnE);
+        if(g.stairsFound) {
+            const btnD = document.createElement('button'); btnD.className="cmd-btn"; btnD.style.borderColor="#ff0";
+            btnD.innerHTML = `<span class="b-name" style="color:#ff0">${g.floor===5?'Gatekeeper':'Descend'}</span><div class="b-meta"><span>${g.floor===5?'中ボス戦':'次の階層へ'}</span></div>`;
+            btnD.onclick = actDescend; area.appendChild(btnD);
+        }
+        const btnR = document.createElement('button'); btnR.className="cmd-btn"; btnR.style.borderColor="#8cf";
+        btnR.innerHTML = `<span class="b-name" style="color:#8cf">Rest</span><div class="b-meta"><span>休息 (-2 Turn)</span></div>`;
+        btnR.onclick = actRest; area.appendChild(btnR);
+    }
+    
+    if(g.floor===10 && g.state!=='BATTLE' && !g.enemy) {
+            const btnBoss = document.createElement('button'); btnBoss.className="cmd-btn";
+            btnBoss.style.borderColor="#f00"; btnBoss.style.background="#300";
+            btnBoss.innerHTML = `<span class="b-name" style="color:#f88">CHALLENGE</span><div class="b-meta"><span>魔王決戦</span></div>`;
+            btnBoss.onclick = actChallengeBoss;
+            document.getElementById('cmd-grid').insertBefore(btnBoss, document.getElementById('cmd-grid').firstChild);
+    }
+}
+
+window.showJobGuide = function() {
+    const l=document.getElementById('job-list'); l.innerHTML="";
+    JOBS.forEach(j=>{ if(j.id==='novice')return;
+        const d=document.createElement('div'); d.className="job-row "+(g.currentJob.id===j.id?"active":"");
+        let r=[]; if(j.req){ if(j.req.t_min)r.push(`Hot≧${j.req.t_min}`); if(j.req.t_max)r.push(`Cool≧${100-j.req.t_max}`); if(j.req.d_min)r.push(`Deep≧${j.req.d_min}`); if(j.req.d_max)r.push(`Shallow≧${100-j.req.d_max}`); if(j.req.r_min)r.push(`Rigid≧${j.req.r_min}`); if(j.req.r_max)r.push(`Flex≧${100-j.req.r_max}`); }
+        d.innerHTML=`<strong style="color:${g.currentJob.id===j.id?'#ff0':'#eee'}">${j.name}</strong> <span class="b-unique" style="font-size:0.7em; padding-left:4px;">${j.skill?j.skill.name:""}</span><span class="job-eff">${j.desc}</span><span style="font-size:0.75em; color:#aaa">条件: ${r.join(' / ')||"なし"}</span>`; l.appendChild(d);
+    }); document.getElementById('modal-job').style.display='block';
+};
+window.closeJobGuide = function(e){ if(e.target.id==='modal-job') e.target.style.display='none'; };
+
+// 起動
+window.onload = () => updateUI();
+</script>
+</body>
+</html>
