@@ -1,13 +1,16 @@
-// エラーハンドリング
+// エラーハンドリング（万が一の時に画面に表示）
 window.onerror = function(msg, url, line) {
     const el = document.getElementById('error-trap');
-    if(el) { el.style.display = 'block'; el.innerText = `ERROR: ${msg} (Line ${line})`; }
+    if(el) { 
+        el.style.display = 'block'; 
+        el.innerText = `ERROR: ${msg} (Line ${line})`; 
+    }
     return false;
 };
 
-// --- 定数 ---
+// --- 定数・設定 ---
 const CONF = { initTurns: 150, maxFloor: 10, itemMax: 3 };
-const SAVE_KEY = 'trd_save_data_v8_fix';
+const SAVE_KEY = 'trd_save_data_v9_final'; // キーを更新
 
 const JOBS = [
     { id:'novice', name:'Novice', req:null, bonus:{}, desc:"特徴なし" },
@@ -23,10 +26,9 @@ const JOBS = [
     { id:'assassin', name:'Assassin', req:{t_min:60, d_max:40}, bonus:{phys:1.1, crit:0.1}, desc:"物+10% Crit+10%", priority:2, skill:{name:"Backstab", type:"phys", mp:5, pwr:1.8, acc:1.0, desc:"必中・高威力"} },
     { id:'sage', name:'Sage', req:{t_max:40, r_max:40}, bonus:{mag:1.1, heal:1.2}, desc:"魔+10% 回+20%", priority:2, skill:{name:"BigBang", type:"mag", mp:10, pwr:2.5, acc:1.0, desc:"究極魔法"} },
     { id:'sentinel', name:'Sentinel', req:{d_min:60, r_max:40}, bonus:{def:0.7, time:1}, desc:"耐-30% 撃破時時+1", priority:2, skill:{name:"Aegis", type:"def", mp:5, pwr:0, acc:1.0, desc:"絶対防御"} },
-    // New Reaper (Int-Dex)
     { id:'reaper', name:'Reaper', req:{t_max:40, r_min:60}, bonus:{mag:1.1, crit:0.1}, desc:"魔+10% 即死使い", priority:2, skill:{name:"Execution", type:"mag", mp:8, pwr:1.0, acc:0.9, desc:"確率即死", isInstantDeath:true} },
 
-    // High Tier (80)
+    // High Tier
     { id:'samurai', name:'Samurai', req:{t_min:80, r_min:80}, bonus:{phys:1.3, crit:0.2}, desc:"物+30% Crit+20%", priority:3, skill:{name:"Zantetsu", type:"phys", mp:8, pwr:3.0, acc:0.85, desc:"一撃必殺"} },
     { id:'archmage', name:'Archmage', req:{t_max:20, r_max:20}, bonus:{mag:1.3, heal:1.3}, desc:"魔+30% 回+30%", priority:3, skill:{name:"Meteor", type:"mag", mp:12, pwr:3.5, acc:1.0, desc:"隕石召喚"} },
     { id:'ninja', name:'Ninja', req:{d_max:20, r_min:80}, bonus:{eva:0.25, crit:0.2}, desc:"避+25% Crit+20%", priority:3, skill:{name:"Assassinate", type:"phys", mp:8, pwr:2.0, acc:1.0, desc:"即死攻撃", isInstantDeath:true} }
@@ -49,6 +51,7 @@ const ITEM_DATA = {
     clock:  { name: "Clock", desc: "寿命+10", type: "turn", val: 10 }
 };
 
+// 初期ステート
 const INITIAL_G = {
     state: 'EXPLORE', floor: 1, stairsFound: false, searchCount: 0,
     turns: CONF.initTurns, maxTurns: CONF.initTurns,
@@ -73,12 +76,16 @@ function loadGame() {
         if(!d) { log("記録がありません", "l-gry"); return; }
         const loaded = JSON.parse(d);
         g = { ...INITIAL_G, ...loaded };
-        updateJob(); log("記録を読込", "l-sys"); updateUI();
+        // クラスなどの参照を復元
+        updateJob();
+        log("記録を読込", "l-sys"); 
+        updateUI();
     } catch(e) { log("読込失敗", "l-red"); }
 }
 function resetGame() {
     if(!confirm("リセットしますか？")) return;
-    localStorage.removeItem(SAVE_KEY); location.reload();
+    localStorage.removeItem(SAVE_KEY); 
+    location.reload();
 }
 
 // --- Logic ---
@@ -108,6 +115,7 @@ function updateJob() {
 }
 function getDeck() {
     const t=g.axis.T, d=g.axis.D, r=g.axis.R;
+    // 魔法職は通常攻撃が魔法弾になる
     let basic = {id:'atk', name:"Attack", type:"phys", mp:0, pwr:1.0, acc:0.95, desc:"通常攻撃"};
     if (['wizard','archmage','sage','reaper'].includes(g.currentJob.id)) {
             basic = {id:'mag_atk', name:"Magic Shot", type:"mag", mp:2, pwr:0.8, acc:1.0, desc:"魔力攻撃"};
@@ -152,6 +160,7 @@ function calcDmg(pwr, type, s) {
     return {min:Math.floor(net*0.9), max:Math.floor(net*1.1)};
 }
 
+// Actions
 function log(msg, cls="") { const d=document.createElement('div'); d.className=cls; d.innerText=msg; document.getElementById('log-list').prepend(d); }
 function consumeTime(v) {
     if(g.gameOver) return false;
@@ -458,4 +467,39 @@ function renderCmd(s) {
         area.appendChild(btnIg);
     } else {
         const btnE = document.createElement('button'); btnE.className="cmd-btn";
-        btnE.
+        btnE.innerHTML = `<span class="b-name">Explore</span><div class="b-meta"><span>探索 (-1 Turn)</span></div>`;
+        btnE.onclick = actExplore; area.appendChild(btnE);
+        if(g.stairsFound) {
+            const btnD = document.createElement('button'); btnD.className="cmd-btn"; btnD.style.borderColor="#ff0";
+            btnD.innerHTML = `<span class="b-name" style="color:#ff0">${g.floor===5?'Gatekeeper':'Descend'}</span><div class="b-meta"><span>${g.floor===5?'中ボス戦':'次の階層へ'}</span></div>`;
+            btnD.onclick = actDescend; area.appendChild(btnD);
+        }
+        const btnR = document.createElement('button'); btnR.className="cmd-btn"; btnR.style.borderColor="#8cf";
+        btnR.innerHTML = `<span class="b-name" style="color:#8cf">Rest</span><div class="b-meta"><span>休息 (-2 Turn)</span></div>`;
+        btnR.onclick = actRest; area.appendChild(btnR);
+    }
+    
+    if(g.floor===10 && g.state!=='BATTLE' && !g.enemy) {
+            const btnBoss = document.createElement('button'); btnBoss.className="cmd-btn";
+            btnBoss.style.borderColor="#f00"; btnBoss.style.background="#300";
+            btnBoss.innerHTML = `<span class="b-name" style="color:#f88">CHALLENGE</span><div class="b-meta"><span>魔王決戦</span></div>`;
+            btnBoss.onclick = actChallengeBoss;
+            document.getElementById('cmd-grid').insertBefore(btnBoss, document.getElementById('cmd-grid').firstChild);
+    }
+}
+
+window.showJobGuide = function() {
+    const l=document.getElementById('job-list'); l.innerHTML="";
+    JOBS.forEach(j=>{ if(j.id==='novice')return;
+        const d=document.createElement('div'); d.className="job-row "+(g.currentJob.id===j.id?"active":"");
+        let r=[]; if(j.req){ if(j.req.t_min)r.push(`Hot≧${j.req.t_min}`); if(j.req.t_max)r.push(`Cool≧${100-j.req.t_max}`); if(j.req.d_min)r.push(`Deep≧${j.req.d_min}`); if(j.req.d_max)r.push(`Shallow≧${100-j.req.d_max}`); if(j.req.r_min)r.push(`Rigid≧${j.req.r_min}`); if(j.req.r_max)r.push(`Flex≧${100-j.req.r_max}`); }
+        d.innerHTML=`<strong style="color:${g.currentJob.id===j.id?'#ff0':'#eee'}">${j.name}</strong> <span class="b-unique" style="font-size:0.7em; padding-left:4px;">${j.skill?j.skill.name:""}</span><span class="job-eff">${j.desc}</span><span style="font-size:0.75em; color:#aaa">条件: ${r.join(' / ')||"なし"}</span>`; l.appendChild(d);
+    }); document.getElementById('modal-job').style.display='block';
+};
+window.closeJobGuide = function(e){ if(e.target.id==='modal-job') e.target.style.display='none'; };
+
+// 起動
+window.onload = () => updateUI();
+</script>
+</body>
+</html>
