@@ -280,6 +280,56 @@ button {
     align-items: center;
 }
 
+/* --- モーダル内のボタン (Level Up / Job Guide) --- */
+.m-btn {
+    width: 100%;
+    padding: 16px 20px;   /* タップエリアを大きく */
+    margin: 8px 0;
+    
+    /* ダークな背景に変更（白くならないように） */
+    background: linear-gradient(90deg, #2a2a2a, #151515); 
+    color: #fff;          /* 文字色 */
+    
+    /* ネオン感のある枠線 */
+    border: 1px solid #444;
+    border-left: 6px solid #ffeb3b; /* 左端に黄色いアクセントバー */
+    
+    text-align: left;
+    font-size: 1.1em;     /* 文字サイズアップ */
+    font-weight: bold;    /* 太字に */
+    border-radius: 4px;
+    
+    /* 浮き上がっているような影 */
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5); 
+    transition: transform 0.1s, border-color 0.2s;
+}
+
+.m-btn:active {
+    transform: scale(0.98); /* 押すと少し凹む演出 */
+    background: #333;
+}
+
+/* ボタン右側の「INT↓」などの補足テキスト */
+.m-btn span {
+    float: right;
+    color: #ff5252; /* 下がるステータスは赤色で強調 */
+    font-size: 0.9em;
+    font-weight: normal;
+    background: rgba(0,0,0,0.3);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+/* ジョブガイド内の条件テキスト */
+.job-req { 
+    font-size: 0.85em; 
+    color: #ffab00; /* オレンジ色 */
+    display: block; 
+    margin-top: 4px;
+    font-weight: bold;
+}
+
 /* display: flex がJSで付与されると崩れるのを防ぐため、
    JSは .style.display='flex' にするか、
    あるいは .show クラスで制御するのがベストだが、
+
