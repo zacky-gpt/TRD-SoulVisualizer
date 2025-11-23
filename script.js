@@ -447,13 +447,21 @@ function applyDamageToEnemy(dmg, sourceName, type='phys') {
     if(sourceName !== "Parry") log(`${sourceName}! ${dmg}dmg`, "l-blu"); 
 }
 
+// ↓ この関数を上書きしてください
 function applyDamage(dmg, isBig=false) {
+    // ここで強制的に整数にする（小数を許さない）
+    dmg = Math.floor(dmg);
+    
     g.hp -= dmg; 
+    
     if(dmg > 0) {
         if(isBig) log(`【溜め攻撃】 ${dmg}dmg!!`,"l-dmg");
         else log(`被弾 ${dmg}dmg`,"l-dmg");
     }
     
+    // HP表示の更新（小数が残らないように念のため）
+    g.hp = Math.floor(g.hp);
+
     if(g.hp <= 0) {
         if(g.immortalTurns > 0) {
             g.hp = 1;
@@ -461,6 +469,7 @@ function applyDamage(dmg, isBig=false) {
         } else {
             g.gameOver = true;
             log("敗北...","l-red");
+            updateUI(); // 死亡時に即座にUI更新してGameOverボタンを出す
         }
     }
 }
@@ -696,3 +705,4 @@ window.onload = () => {
     if(localStorage.getItem(SAVE_KEY)) loadGame();
     else updateUI();
 };
+
