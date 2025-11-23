@@ -191,36 +191,51 @@ function tickBattleTurns() {
     if(g.immortalTurns > 0) g.immortalTurns--;
 }
 
+// 探索アクションのロジック修正
 function actExplore() {
     if(g.gameOver || !consumeTime(1)) return;
-    g.searchCount = (g.searchCount||0)+1;
-    
-    // イベント判定 (抽選)
+
+    // 1. ランダムイベント判定 (敵・宝箱・性格変動)
     const r = Math.random();
-    let eventOccurred = false;
-
-    if(r<0.6) { startBattle(); eventOccurred=true; }
-    else if(r<0.7) { startChest(); eventOccurred=true; }
-    else if(r<0.8) {
-        const k=['T','D','R'][Math.floor(Math.random()*3)]; const v=Math.random()<.5?5:-5;
-        g.axis[k]=Math.max(0,Math.min(100, g.axis[k]+v)); log("磁場異常！性格変動","l-yel");
-        eventOccurred=true;
+    
+    if(r < 0.6) {
+        startBattle();
+        return;
+    }
+    if(r < 0.7) {
+        startChest();
+        return;
+    }
+    if(r < 0.8) {
+        const k=['T','D','R'][Math.floor(Math.random()*3)]; 
+        const v=Math.random()<.5?5:-5;
+        g.axis[k]=Math.max(0,Math.min(100, g.axis[k]+v)); 
+        log("磁場異常！性格がわずかに変動した","l-yel");
+        updateUI();
+        return;
     }
 
-    // 階段判定 (並列処理)
-    // 累積確率: 1回10%
-    const findChance = g.searchCount * 0.1; 
-    if(!g.stairsFound && Math.random() < findChance) {
+    // 2. 何も起きなかった場合 (虚無)
+    
+    // A. すでに階段を見つけている場合 -> 経験値稼ぎ
+    if(g.stairsFound) {
+        g.exp += 5;
+        log("瓦礫をあさった...(Exp+5)", "l-gry");
+        updateUI();
+        return;
+    }
+
+    // B. まだ見つけていない場合 -> 階段探索 (Pity System)
+    g.searchCount = (g.searchCount || 0) + 1;
+    const findChance = g.searchCount * 0.1; // 1回探索するごとに10%上昇
+
+    if(Math.random() < findChance) {
         g.stairsFound = true;
-        if(eventOccurred) log("...そして階段も見つけた！","l-grn");
-        else log(`探索の末、階段発見！(捜索${g.searchCount}回)`,"l-grn");
+        log(`階段を発見した！(捜索${g.searchCount}回目)`, "l-grn");
     } else {
-        if(!eventOccurred) {
-            g.exp += 5;
-            log(`気配が強まる...(${Math.floor(findChance*100)}%)`, "l-gry");
-        }
+        log(`何もなかった... 気配が強まる(${Math.floor(findChance*100)}%)`, "l-gry");
     }
-
+    
     updateUI();
 }
 
@@ -659,3 +674,4 @@ window.onload = () => {
     if(localStorage.getItem(SAVE_KEY)) loadGame();
     else updateUI();
 };
+
