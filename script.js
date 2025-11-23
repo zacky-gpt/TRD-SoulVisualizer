@@ -501,13 +501,29 @@ function useItem(k) {
 function actRest() { if(g.gameOver||!consumeTime(2)) return; const s=getStats(); g.hp=Math.min(g.mhp, g.hp+15+s.MND*2); g.mp=Math.min(g.mmp, g.mp+8+s.MND); log("休息","l-grn"); saveGame(); updateUI(); }
 function actDescend() {
     if(g.gameOver) return;
-    if(g.floor===5) { startBattle({ ...BOSSES[5], lv:5, isBoss:true, mhp:BOSSES[5].hp }); return; }
+    
+    // 中ボス（5階）のレベルを 5 -> 10 に強化！
+    if(g.floor===5) { 
+        startBattle({ ...BOSSES[5], lv:10, isBoss:true, mhp:BOSSES[5].hp }); 
+        return; 
+    }
+    
     g.floor++; g.stairsFound=false; g.searchCount=0;
     log("全回復！","l-grn"); g.hp=g.mhp; g.mp=g.mmp;
     if(g.floor===10) log("最深部...","l-boss"); else log(`B${g.floor}へ`,"l-yel");
     saveGame(); updateUI();
 }
-function actChallengeBoss() { startBattle({ ...BOSSES[10], lv:10, isBoss:true, mhp:BOSSES[10].hp }); }
+function actChallengeBoss() { 
+    // レベルを20に設定（防御力が跳ね上がります）
+    // HPも500だとLv20にしては低いので、800に強化しておきます
+    startBattle({ 
+        ...BOSSES[10], 
+        lv: 20, 
+        isBoss: true, 
+        mhp: 800, // HP強化
+        atk: 35   // 攻撃力もLv相応に強化(25->35)
+    }); 
+}
 function actRun() {
     if(g.gameOver||!consumeTime(1)) return; const s=getStats();
     let r = 0.4+(s.AGI*0.015)-(g.enemy.lv*0.01); if(g.currentJob.bonus.eva) r+=g.currentJob.bonus.eva;
@@ -670,3 +686,4 @@ window.onload = () => {
     if(localStorage.getItem(SAVE_KEY)) loadGame();
     else updateUI();
 };
+
