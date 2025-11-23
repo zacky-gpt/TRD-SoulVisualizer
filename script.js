@@ -7,10 +7,10 @@ window.onerror = function(msg, url, line) {
 
 // --- 定数 ---
 const CONF = { initTurns: 150, maxFloor: 10, itemMax: 3 };
-const SAVE_KEY = 'trd_save_data_v13_fix'; // Key updated
+const SAVE_KEY = 'trd_save_data_v14_guts'; // Key updated
 
 const JOBS = [
-    // Middle Path (Priority tweaked)
+    // Middle Path
     { id:'novice', name:'Novice', req:null, bonus:{}, desc:"凡人", priority:1, skill:{name:"Guts", type:"buff", cd:15, pwr:0, acc:1.0, desc:"食いしばり(2T)"} },
     { id:'veteran', name:'Veteran', req:{lv_min:10}, bonus:{phys:1.1, mag:1.1, def:0.9}, desc:"熟練者(全能微増)", priority:1.2, skill:{name:"Guts+", type:"buff", cd:15, pwr:0, acc:1.0, desc:"食いしばり(3T)+攻UP"} },
     { id:'hero', name:'Hero', req:{lv_min:20}, bonus:{phys:1.2, mag:1.2, def:0.8, eva:0.1}, desc:"英雄(全能強化)", priority:1.5, skill:{name:"Awakening", type:"buff", cd:20, pwr:0, acc:1.0, desc:"覚醒(4T不死+全強化)"} },
@@ -93,7 +93,7 @@ function resetGame() {
 // --- Logic ---
 function getStats() {
     let b = 5 + (g.lv * 1.0); 
-    if(g.awakening) b *= 1.5;
+    if(g.awakening) b *= 1.5; // Awakening Effect
     const a = g.axis;
     return {
         STR: Math.floor(b * (a.T/50)), INT: Math.floor(b * ((100-a.T)/50)),
@@ -107,7 +107,6 @@ function updateJob() {
         if(j.req && j.req.lv_min) {
             if(g.lv < j.req.lv_min) continue;
         }
-        
         if(j.req) {
             if(j.req.t_min!==undefined && t<=j.req.t_min) continue;
             if(j.req.t_max!==undefined && t>=j.req.t_max) continue;
@@ -116,16 +115,12 @@ function updateJob() {
             if(j.req.r_min!==undefined && r<=j.req.r_min) continue;
             if(j.req.r_max!==undefined && r>=j.req.r_max) continue;
         }
-        
         const p = j.priority || 1;
-        // Priority check: if priority is higher, update best
         if(p > bestP) { best=j; bestP=p; }
         else if(p === bestP) {
-            // Same priority, usually stick to specialized over novice path if stats meet
-            if(j.id !== 'novice') best=j; 
+            if(j.id !== 'novice' && j.id !== 'veteran' && j.id !== 'hero') best=j; 
         }
     }
-    // Reset CD if job changes
     if(g.currentJob.id !== best.id) {
         g.currentJob = best;
         g.jobSkillCd = 0;
@@ -133,7 +128,6 @@ function updateJob() {
         g.currentJob = best;
     }
 }
-
 function getDeck() {
     const t=g.axis.T, d=g.axis.D, r=g.axis.R;
     let basic = {id:'atk', name:"Attack", type:"phys", mp:0, pwr:1.0, acc:0.95, desc:"通常攻撃"};
@@ -142,8 +136,8 @@ function getDeck() {
     }
     const deck = [basic];
 
-    if(t>60) deck.push({id:'smash', name:"Smash", type:"phys", mp:4, pwr:1.7, acc:0.75, cap:0.7, desc:"強打(最大70%)"});
-    else if(t<40) deck.push({id:'ice', name:"IceBolt", type:"mag", mp:8, pwr:1.3, acc:1.0, desc:"氷魔法"});
+    if(t>60) deck.push({id:'smash', name:"Smash", type:"phys", mp:4, pwr:1.7, acc:0.75, cap:0.7, desc:"強打(70%)"});
+    else if(t<40) deck.push({id:'ice', name:"IceBolt", type:"mag", mp:12, pwr:1.3, acc:1.0, desc:"氷魔法"});
     else deck.push({id:'fire', name:"FireBlade", type:"hyb", mp:8, pwr:1.5, acc:0.95, desc:"炎剣"});
     
     if(d>60) deck.push({id:'guard', name:"Guard", type:"def", mp:0, pwr:0, acc:1.0, desc:"防御"});
@@ -159,21 +153,14 @@ function getDeck() {
 }
 
 function calcHit(acc, type, s, cap) {
-    // Smash Cap logic
-    if(g.isFocused) {
-        if(cap !== undefined) return cap; // Focused but capped
-        return 1.0;
-    }
+    if(g.isFocused) return 1.0;
     let r = acc; if(type==='phys'||type==='hyb') r += (s.DEX * 0.01);
     if(g.enemy) r -= g.enemy.eva;
     let res = Math.min(1.0, Math.max(0.0, r));
     if(cap !== undefined) res = Math.min(res, cap);
     return res;
 }
-function calcDmg(sk, s) {
-    const type = sk.type;
-    const pwr = sk.pwr;
-    
+function calcDmg(pwr, type, s) {
     if(type==='heal'||type==='def'||type==='buff') return {min:0,max:0};
     let base = 0;
     if(type==='phys') base=s.STR; else if(type==='mag') base=s.INT; else if(type==='hyb') base=(s.STR+s.INT)*0.6;
@@ -183,7 +170,7 @@ function calcDmg(sk, s) {
     if(type==='phys' && jb.phys) mod *= jb.phys; if(type==='mag' && jb.mag) mod *= jb.mag;
     
     // Paladin bonus
-    if(sk.name === 'HolyBlade' && g.enemy.id === 'ghost') mod *= 2.0;
+    if(g.currentJob.id === 'paladin' && g.enemy.id === 'ghost') mod *= 2.0;
 
     let val = Math.floor(base * pwr * mod); if(val < 1) val = 1;
     if(!g.enemy) return {min:0, max:0};
@@ -254,8 +241,16 @@ function actBattle(sk) {
     }
     if(sk.id==='parry') { g.parryActive = true; log("構えた！(Parry)","l-grn"); enemyTurn(); updateUI(); return; }
     if(sk.id==='focus') { g.isFocused = true; log("集中！(次回必中Crit)","l-grn"); enemyTurn(); updateUI(); return; }
-    if(sk.id==='Guts' || sk.id==='Guts+') { g.immortalTurns = sk.id==='Guts'?2:3; if(sk.id==='Guts+') g.awakening=true; log("ド根性！食いしばり付与","l-grn"); enemyTurn(); updateUI(); return; }
-    if(sk.id==='Awakening') { g.immortalTurns = 4; g.awakening=true; log("覚醒！能力UP＆不死！","l-spd"); enemyTurn(); updateUI(); return; }
+    
+    if(sk.id==='Guts' || sk.id==='Guts+') { 
+        g.immortalTurns = sk.id==='Guts'?2:3; 
+        if(sk.id==='Guts+') g.awakening=true; 
+        log("ド根性！食いしばり付与","l-grn"); enemyTurn(); updateUI(); return; 
+    }
+    if(sk.id==='Awakening') { 
+        g.immortalTurns = 4; g.awakening=true; 
+        log("覚醒！能力UP＆不死！","l-spd"); enemyTurn(); updateUI(); return; 
+    }
     
     if(sk.id==='ironwall' || sk.id==='aegis' || sk.name==='Guard') { 
         log(`${sk.name}! (防御)`,"l-grn"); enemyTurn(true); updateUI(); return; 
@@ -265,7 +260,7 @@ function actBattle(sk) {
         const hit = calcHit(sk.acc, sk.type, s);
         if(Math.random() > hit) log("ミス！","l-gry");
         else {
-            const d = calcDmg(sk, s);
+            const d = calcDmg(sk.pwr, sk.type, s);
             let dmg = Math.floor(d.min + Math.random()*(d.max-d.min));
             g.enemy.hp -= dmg; log(`${sk.name}! ${dmg}dmg`,"l-blu");
             const items = Object.keys(ITEM_DATA);
@@ -277,7 +272,6 @@ function actBattle(sk) {
         updateUI(); return;
     }
 
-    // Instant Death
     if(sk.isInstantDeath) {
         let rate = 0.5; 
         if(g.enemy.isBoss) rate = (g.floor===5) ? 0.10 : 0.03;
@@ -290,7 +284,7 @@ function actBattle(sk) {
         const hit = calcHit(sk.acc, sk.type, s, sk.cap);
         if(Math.random() > hit) log("ミス！","l-gry");
         else {
-            const range = calcDmg(sk, s);
+            const range = calcDmg(sk.pwr, sk.type, s);
             let dmg = Math.floor(range.min + Math.random()*(range.max-range.min+1));
             let cr=0.05; 
             if(sk.id==='snipe' || g.isFocused) cr=1.0; 
@@ -344,7 +338,7 @@ function enemyTurn(guard=false) {
                 if(g.enemy.hp<=0){winBattle();return;} 
             }
         }
-        applyDamage(dmg, true);
+        checkDeath(dmg, true);
         return;
     }
 
@@ -380,10 +374,11 @@ function enemyTurn(guard=false) {
         if(just) { const counter = Math.floor(s.DEX*2); g.enemy.hp -= counter; log(`反撃！ ${counter}dmg`,"l-grn"); if(g.enemy.hp<=0){winBattle();return;} }
     }
 
-    applyDamage(dmg);
+    checkDeath(dmg);
 }
 
-function applyDamage(dmg, isBig=false) {
+// ダメージ適用と死亡判定を分離
+function checkDeath(dmg, isBig=false) {
     g.hp -= dmg; 
     if(isBig) log(`【溜め攻撃】 ${dmg}dmg!!`,"l-dmg");
     else log(`被弾 ${dmg}dmg`,"l-dmg");
@@ -436,7 +431,8 @@ function actInspect() { if(g.gameOver) return; if(g.mp<2){log("MP不足","l-gry"
 function actDisarm() { if(g.gameOver) return; if(g.mp<3){log("MP不足","l-gry");return;} g.mp-=3; const s=getStats(); if(Math.random()<(30+s.DEX*2)/100) { log("解除成功","l-grn"); g.chest.trap=false; actOpen(false); } else { log("失敗!","l-red"); actOpen(true); } }
 function actOpen(f) {
     if(g.gameOver) return;
-    if(g.chest.trap||f) { const d=10+g.floor*2; g.hp-=d; log(`爆発! ${d}dmg`,"l-dmg"); if(g.hp<=0){g.gameOver=true; updateUI(); return;} }
+    if(g.chest.trap||f) { const d=10+g.floor*2; checkDeath(d, true); if(g.gameOver){ updateUI(); return; } }
+    
     const it = g.chest.item;
     if(it === 'clock') { g.turns = Math.min(g.maxTurns, g.turns + 10); log("時計発見! 寿命+10", "l-yel"); }
     else {
@@ -509,12 +505,12 @@ function updateUI() {
 function updateEncounter() {
     const b = document.getElementById('encounter-box'); const c = document.getElementById('enc-content');
     if(g.state==='BATTLE' && g.enemy) {
-        b.style.display='flex'; 
+        b.style.display='block'; 
         if(g.enemy.isBoss) b.style.borderColor='#f80';
         else b.style.borderColor = g.enemy.id==='slime'?'#484':(g.enemy.id==='ghost'?'#468':'#666');
         c.innerHTML = `<span class="en-name" style="color:#fff">${g.enemy.name} (Lv${g.enemy.lv})</span><span class="en-desc">${g.enemy.desc}</span><br><div style="margin-top:2px; color:#fa0;">HP: ${g.enemy.hp} / ${g.enemy.mhp}</div>`;
     } else if(g.state==='CHEST' && g.chest) {
-        b.style.display='flex'; b.style.borderColor='#ba0';
+        b.style.display='block'; b.style.borderColor='#ba0';
         let i = g.chest.identified ? (g.chest.trap?"<span style='color:#f66'>罠あり</span>":"<span style='color:#6f6'>安全</span>") : "未鑑定";
         c.innerHTML = `<span class="en-name" style="color:#fd0">Treasure Chest</span><span class="en-desc">状態: ${i}</span>`;
     } else { b.style.display='none'; }
@@ -548,7 +544,7 @@ function renderCmd(s) {
             else if(sk.type==='def'||sk.type==='buff') pred = `<span class="b-pred">-</span>`;
             else {
                 const hit = Math.floor(calcHit(sk.acc, sk.type, s, sk.cap)*100);
-                const d = calcDmg(sk, s);
+                const d = calcDmg(sk.pwr, sk.type, s);
                 pred = `<span class="b-pred">${Math.floor(hit)}% ${d.min}-${d.max}</span>`;
             }
             
@@ -617,7 +613,7 @@ window.showJobGuide = function() {
         const d=document.createElement('div'); d.className="job-row "+(g.currentJob.id===j.id?"active":"");
         let r=[]; if(j.req){ if(j.req.t_min)r.push(`Hot≧${j.req.t_min}`); if(j.req.t_max)r.push(`Cool≧${100-j.req.t_max}`); if(j.req.d_min)r.push(`Deep≧${j.req.d_min}`); if(j.req.d_max)r.push(`Shallow≧${100-j.req.d_max}`); if(j.req.r_min)r.push(`Rigid≧${j.req.r_min}`); if(j.req.r_max)r.push(`Flex≧${100-j.req.r_max}`); }
         d.innerHTML=`<strong style="color:${g.currentJob.id===j.id?'#ff0':'#eee'}">${j.name}</strong> <span class="b-unique" style="font-size:0.7em; padding-left:4px;">${j.skill?j.skill.name:""}</span><span class="job-eff">${j.desc}</span><span style="font-size:0.75em; color:#aaa">条件: ${r.join(' / ')||"なし"}</span>`; l.appendChild(d);
-    }); document.getElementById('modal-job').style.display='flex'; // changed to flex
+    }); document.getElementById('modal-job').style.display='flex';
 };
 window.closeJobGuide = function(e){ if(e.target.id==='modal-job') e.target.style.display='none'; };
 
