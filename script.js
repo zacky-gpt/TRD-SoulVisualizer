@@ -7,15 +7,15 @@ window.onerror = function(msg, url, line) {
 
 // --- 定数 ---
 const CONF = { initTurns: 150, maxFloor: 10, itemMax: 3 };
-const SAVE_KEY = 'trd_save_data_v18_logic';
+const SAVE_KEY = 'trd_save_data_v19_tiers'; // Key updated
 
 // Job Data
-// req: 70に引き上げ
+// 基準: 70(Tier1), 80(Tier2)
 const JOBS = [
     // Middle Path
-    { id:'novice', name:'Novice', req:null, bonus:{}, desc:"凡人", priority:1, skill:{name:"Guts", type:"buff", cd:15, desc:"食いしばり(2T)"} },
-    { id:'veteran', name:'Veteran', req:{lv_min:10}, bonus:{phys:1.1, mag:1.1, def:0.9}, desc:"熟練者(全能微増)", priority:1.2, skill:{name:"Guts+", type:"buff", cd:15, desc:"食いしばり(3T)+攻UP"} },
-    { id:'hero', name:'Hero', req:{lv_min:20}, bonus:{phys:1.2, mag:1.2, def:0.8, eva:0.1}, desc:"英雄(全能強化)", priority:1.5, skill:{name:"Awakening", type:"buff", cd:20, desc:"覚醒(4T不死+全強化)"} },
+    { id:'novice', name:'Novice', req:null, bonus:{}, desc:"凡人", priority:1, skill:{name:"Guts", type:"buff", cd:15, pwr:0, acc:1.0, desc:"食いしばり(2T)"} },
+    { id:'veteran', name:'Veteran', req:{lv_min:10}, bonus:{phys:1.1, mag:1.1, def:0.9}, desc:"熟練者(全能微増)", priority:1.2, skill:{name:"Guts+", type:"buff", cd:15, pwr:0, acc:1.0, desc:"食いしばり(3T)+攻UP"} },
+    { id:'hero', name:'Hero', req:{lv_min:20}, bonus:{phys:1.2, mag:1.2, def:0.8, eva:0.1}, desc:"英雄(全能強化)", priority:1.5, skill:{name:"Awakening", type:"buff", cd:20, pwr:0, acc:1.0, desc:"覚醒(4T不死+全強化)"} },
 
     // T-Axis (70)
     { id:'warrior', name:'Warrior', req:{t_min:70}, bonus:{phys:1.2}, desc:"物攻+20%", priority:2, skill:{name:"Braver", type:"phys", cd:10, pwr:2.5, acc:0.95, desc:"必殺の一撃"} },
@@ -29,17 +29,17 @@ const JOBS = [
     { id:'sniper', name:'Sniper', req:{r_min:70}, bonus:{crit:0.2}, desc:"Crit+20%", priority:2, skill:{name:"Headshot", type:"phys", cd:8, pwr:1.8, acc:1.0, desc:"確定クリティカル"} },
     { id:'cleric', name:'Cleric', req:{r_max:30}, bonus:{heal:1.3}, desc:"回復+30%", priority:2, skill:{name:"Pray", type:"heal", cd:12, pwr:0, acc:1.0, desc:"特大回復"} },
     
-    // Hybrid (70)
+    // Hybrid (70 & 70 -> or one side extreme? Let's stick to 70)
     { id:'paladin', name:'Paladin', req:{t_min:70, d_min:70}, bonus:{phys:1.1, def:0.85}, desc:"物+10% 耐-15%", priority:2, skill:{name:"HolyBlade", type:"hyb", cd:10, pwr:2.2, acc:1.0, desc:"聖なる剣(対霊特効)"} },
     { id:'assassin', name:'Assassin', req:{t_min:70, d_max:30}, bonus:{phys:1.1, crit:0.1}, desc:"物+10% Crit+10%", priority:2, skill:{name:"Backstab", type:"phys", cd:10, pwr:2.0, acc:1.0, desc:"背後から一撃"} },
     { id:'sage', name:'Sage', req:{t_max:30, r_max:30}, bonus:{mag:1.1, heal:1.2}, desc:"魔+10% 回+20%", priority:2, skill:{name:"BigBang", type:"mag", cd:15, pwr:3.0, acc:1.0, desc:"究極魔法"} },
     { id:'sentinel', name:'Sentinel', req:{d_min:70, r_max:30}, bonus:{def:0.7, time:1}, desc:"耐-30% 撃破時時+1", priority:2, skill:{name:"Aegis", type:"buff", cd:12, pwr:0, acc:1.0, desc:"絶対防御壁"} },
     { id:'reaper', name:'Reaper', req:{t_max:30, r_min:70}, bonus:{mag:1.1, crit:0.1}, desc:"魔+10% 即死使い", priority:2, skill:{name:"Execution", type:"mag", cd:12, pwr:1.0, acc:0.9, desc:"確率即死", isInstantDeath:true} },
 
-    // High Tier (85)
-    { id:'samurai', name:'Samurai', req:{t_min:85, r_min:85}, bonus:{phys:1.3, crit:0.2}, desc:"物+30% Crit+20%", priority:3, skill:{name:"Zantetsu", type:"phys", cd:15, pwr:3.5, acc:1.0, desc:"一撃必殺"} },
-    { id:'archmage', name:'Archmage', req:{t_max:15, r_max:15}, bonus:{mag:1.3, heal:1.3}, desc:"魔+30% 回+30%", priority:3, skill:{name:"Meteor", type:"mag", cd:18, pwr:4.0, acc:1.0, desc:"隕石召喚"} },
-    { id:'ninja', name:'Ninja', req:{d_max:15, r_min:85}, bonus:{eva:0.25, crit:0.2}, desc:"避+25% Crit+20%", priority:3, skill:{name:"Assassinate", type:"phys", cd:12, pwr:2.2, acc:1.0, desc:"即死攻撃", isInstantDeath:true} }
+    // High Tier (80)
+    { id:'samurai', name:'Samurai', req:{t_min:80, r_min:80}, bonus:{phys:1.3, crit:0.2}, desc:"物+30% Crit+20%", priority:3, skill:{name:"Zantetsu", type:"phys", cd:15, pwr:3.5, acc:1.0, desc:"一撃必殺"} },
+    { id:'archmage', name:'Archmage', req:{t_max:20, r_max:20}, bonus:{mag:1.3, heal:1.3}, desc:"魔+30% 回+30%", priority:3, skill:{name:"Meteor", type:"mag", cd:18, pwr:4.0, acc:1.0, desc:"隕石召喚"} },
+    { id:'ninja', name:'Ninja', req:{d_max:20, r_min:80}, bonus:{eva:0.25, crit:0.2}, desc:"避+25% Crit+20%", priority:3, skill:{name:"Assassinate", type:"phys", cd:12, pwr:2.2, acc:1.0, desc:"即死攻撃", isInstantDeath:true} }
 ];
 
 const ENEMY_TYPES = [
@@ -72,7 +72,7 @@ const INITIAL_G = {
 let g = JSON.parse(JSON.stringify(INITIAL_G));
 g.currentJob = JOBS[0];
 
-// --- Functions ---
+// --- Global Functions ---
 
 function saveGame() {
     if(g.gameOver) return;
@@ -103,6 +103,8 @@ function getStats() {
         DEX: Math.floor(b * (a.R/50)), MND: Math.floor(b * ((100-a.R)/50))
     };
 }
+
+// Job判定ロジック修正: 境界値を含む ( < ではなく <= )
 function updateJob() {
     const t=g.axis.T, d=g.axis.D, r=g.axis.R; let best=JOBS[0], bestP=0;
     for(let j of JOBS) {
@@ -110,12 +112,14 @@ function updateJob() {
             if(g.lv < j.req.lv_min) continue;
         }
         if(j.req) {
-            if(j.req.t_min!==undefined && t<=j.req.t_min) continue; // > check
-            if(j.req.t_max!==undefined && t>=j.req.t_max) continue;
-            if(j.req.d_min!==undefined && d<=j.req.d_min) continue;
-            if(j.req.d_max!==undefined && d>=j.req.d_max) continue;
-            if(j.req.r_min!==undefined && r<=j.req.r_min) continue;
-            if(j.req.r_max!==undefined && r>=j.req.r_max) continue;
+            // <= is reject condition. If req is 70, t=70 should pass.
+            // So reject if t < 70.
+            if(j.req.t_min!==undefined && t < j.req.t_min) continue;
+            if(j.req.t_max!==undefined && t > j.req.t_max) continue;
+            if(j.req.d_min!==undefined && d < j.req.d_min) continue;
+            if(j.req.d_max!==undefined && d > j.req.d_max) continue;
+            if(j.req.r_min!==undefined && r < j.req.r_min) continue;
+            if(j.req.r_max!==undefined && r > j.req.r_max) continue;
         }
         const p = j.priority || 1;
         if(p > bestP) { best=j; bestP=p; }
@@ -130,6 +134,8 @@ function updateJob() {
         g.currentJob = best;
     }
 }
+
+// Status Skills: Unlock at 60 (Hardcoded tier)
 function getDeck() {
     const t=g.axis.T, d=g.axis.D, r=g.axis.R;
     let basic = {id:'atk', name:"Attack", type:"phys", mp:0, pwr:1.0, acc:0.95, desc:"通常攻撃"};
@@ -138,17 +144,17 @@ function getDeck() {
     }
     const deck = [basic];
 
-    // Skill Req: 60
-    if(t>60) deck.push({id:'smash', name:"Smash", type:"phys", mp:4, pwr:1.7, acc:0.75, cap:0.7, desc:"強打(最大70%)"});
-    else if(t<40) deck.push({id:'ice', name:"IceBolt", type:"mag", mp:8, pwr:1.3, acc:1.0, desc:"氷魔法"});
+    // Skill threshold: 60
+    if(t>=60) deck.push({id:'smash', name:"Smash", type:"phys", mp:4, pwr:1.7, acc:0.75, cap:0.7, desc:"強打(70%)"});
+    else if(t<=40) deck.push({id:'ice', name:"IceBolt", type:"mag", mp:8, pwr:1.3, acc:1.0, desc:"氷魔法"});
     else deck.push({id:'fire', name:"FireBlade", type:"hyb", mp:8, pwr:1.5, acc:0.95, desc:"炎剣"});
     
-    if(d>60) deck.push({id:'guard', name:"Guard", type:"def", mp:0, pwr:0, acc:1.0, desc:"防御"});
-    else if(d<40) deck.push({id:'trip', name:"Trip", type:"def", mp:3, pwr:0, acc:0.8, desc:"足払(行動阻止)"});
+    if(d>=60) deck.push({id:'guard', name:"Guard", type:"def", mp:0, pwr:0, acc:1.0, desc:"防御"});
+    else if(d<=40) deck.push({id:'trip', name:"Trip", type:"def", mp:3, pwr:0, acc:0.8, desc:"足払(行動阻止)"});
     else deck.push({id:'parry', name:"Parry", type:"buff", mp:0, pwr:0, acc:1.0, desc:"パリィ(0MP)"});
     
-    if(r>60) deck.push({id:'snipe', name:"Snipe", type:"phys", mp:4, pwr:1.0, acc:1.0, desc:"必中"});
-    else if(r<40) deck.push({id:'heal', name:"Heal", type:"heal", mp:8, pwr:0, acc:1.0, desc:"回復"});
+    if(r>=60) deck.push({id:'snipe', name:"Snipe", type:"phys", mp:4, pwr:1.0, acc:1.0, desc:"必中"});
+    else if(r<=40) deck.push({id:'heal', name:"Heal", type:"heal", mp:8, pwr:0, acc:1.0, desc:"回復"});
     else deck.push({id:'focus', name:"Focus", type:"buff", mp:2, pwr:0, acc:1.0, desc:"集中"});
 
     if(g.currentJob.skill) { deck.push(g.currentJob.skill); }
@@ -166,14 +172,15 @@ function calcHit(acc, type, s, cap) {
 function calcDmg(sk, s) {
     const type = sk.type;
     const pwr = sk.pwr;
+
     if(type==='heal'||type==='def'||type==='buff') return {min:0,max:0};
-    
     let base = 0;
     if(type==='phys') base=s.STR; else if(type==='mag') base=s.INT; else if(type==='hyb') base=(s.STR+s.INT)*0.6;
     else if(type==='bomb') return {min:30, max:30};
 
     const jb = g.currentJob.bonus; let mod = 1.0;
     if(type==='phys' && jb.phys) mod *= jb.phys; if(type==='mag' && jb.mag) mod *= jb.mag;
+    
     if(g.currentJob.id === 'paladin' && g.enemy.id === 'ghost' && sk.name === 'HolyBlade') mod *= 2.0;
 
     let val = Math.floor(base * pwr * mod); if(val < 1) val = 1;
@@ -190,11 +197,12 @@ function log(msg, cls="") { const d=document.createElement('div'); d.className=c
 function consumeTime(v) {
     if(g.gameOver) return false;
     g.turns -= v; 
+    if(g.jobSkillCd > 0) g.jobSkillCd = Math.max(0, g.jobSkillCd - v);
+    if(g.immortalTurns > 0) g.immortalTurns = Math.max(0, g.immortalTurns - v);
     if(g.turns<=0) { g.gameOver=true; log("寿命が尽きた...","l-red"); updateUI(); return false; } 
     return true;
 }
 function tickBattleTurns() {
-    // 戦闘中のターン経過処理 (バフ/CDのみ)
     if(g.jobSkillCd > 0) g.jobSkillCd--;
     if(g.immortalTurns > 0) g.immortalTurns--;
 }
@@ -220,7 +228,7 @@ function startBattle(fE=null) {
         const t=ENEMY_TYPES[Math.floor(Math.random()*ENEMY_TYPES.length)]; 
         e={...t, lv:lv, type:t.id, mhp:Math.floor((20+lv*8)*t.hpMod), hp:Math.floor((20+lv*8)*t.hpMod), atk:5+lv*2}; 
     }
-    g.enemy=e; g.isCharging=false; g.isStunned=false; g.parryActive=false; g.isFocused=false; g.guardStance=false;
+    g.enemy=e; g.isCharging=false; g.isStunned=false; g.parryActive=false; g.isFocused=false; g.guardStance=0;
     g.state = 'BATTLE';
     log(`[遭遇] ${g.enemy.name} Lv${g.enemy.lv}`, g.enemy.isBoss?"l-boss":"l-red"); updateUI();
 }
@@ -261,7 +269,6 @@ function actBattle(sk) {
         log("覚醒！能力UP＆不死！","l-spd"); enemyTurn(); updateUI(); return; 
     }
     
-    // Guard logic update
     if(sk.id==='ironwall' || sk.id==='aegis' || sk.name==='Guard') { 
         g.guardStance = (sk.id==='ironwall' || sk.id==='aegis') ? 2 : 1; // 2=Perfect, 1=Normal
         log(`${sk.name}! (防御)`,"l-grn"); enemyTurn(); updateUI(); return; 
@@ -322,7 +329,6 @@ function enemyTurn() {
     if(g.enemy.isStunned) {
         log("敵は動けない...","l-grn");
         g.enemy.isStunned = false;
-        // Reset guard even if enemy didn't attack
         g.guardStance = 0;
         return;
     }
