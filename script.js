@@ -7,37 +7,39 @@ window.onerror = function(msg, url, line) {
 
 // --- 定数 ---
 const CONF = { initTurns: 150, maxFloor: 10, itemMax: 3 };
-const SAVE_KEY = 'trd_save_data_v17_nan_fix'; // Key updated
+const SAVE_KEY = 'trd_save_data_v18_logic';
 
+// Job Data
+// req: 70に引き上げ
 const JOBS = [
     // Middle Path
-    { id:'novice', name:'Novice', req:null, bonus:{}, desc:"凡人", priority:1, skill:{name:"Guts", type:"buff", cd:15, pwr:0, acc:1.0, desc:"食いしばり(2T)"} },
-    { id:'veteran', name:'Veteran', req:{lv_min:10}, bonus:{phys:1.1, mag:1.1, def:0.9}, desc:"熟練者(全能微増)", priority:1.2, skill:{name:"Guts+", type:"buff", cd:15, pwr:0, acc:1.0, desc:"食いしばり(3T)+攻UP"} },
-    { id:'hero', name:'Hero', req:{lv_min:20}, bonus:{phys:1.2, mag:1.2, def:0.8, eva:0.1}, desc:"英雄(全能強化)", priority:1.5, skill:{name:"Awakening", type:"buff", cd:20, pwr:0, acc:1.0, desc:"覚醒(4T不死+全強化)"} },
+    { id:'novice', name:'Novice', req:null, bonus:{}, desc:"凡人", priority:1, skill:{name:"Guts", type:"buff", cd:15, desc:"食いしばり(2T)"} },
+    { id:'veteran', name:'Veteran', req:{lv_min:10}, bonus:{phys:1.1, mag:1.1, def:0.9}, desc:"熟練者(全能微増)", priority:1.2, skill:{name:"Guts+", type:"buff", cd:15, desc:"食いしばり(3T)+攻UP"} },
+    { id:'hero', name:'Hero', req:{lv_min:20}, bonus:{phys:1.2, mag:1.2, def:0.8, eva:0.1}, desc:"英雄(全能強化)", priority:1.5, skill:{name:"Awakening", type:"buff", cd:20, desc:"覚醒(4T不死+全強化)"} },
 
-    // T-Axis
-    { id:'warrior', name:'Warrior', req:{t_min:65}, bonus:{phys:1.2}, desc:"物攻+20%", priority:2, skill:{name:"Braver", type:"phys", cd:10, pwr:2.5, acc:0.95, desc:"必殺の一撃"} },
-    { id:'wizard', name:'Wizard', req:{t_max:35}, bonus:{mag:1.2}, desc:"魔攻+20%", priority:2, skill:{name:"Fireball", type:"mag", cd:8, pwr:2.2, acc:1.0, desc:"大爆発"} },
+    // T-Axis (70)
+    { id:'warrior', name:'Warrior', req:{t_min:70}, bonus:{phys:1.2}, desc:"物攻+20%", priority:2, skill:{name:"Braver", type:"phys", cd:10, pwr:2.5, acc:0.95, desc:"必殺の一撃"} },
+    { id:'wizard', name:'Wizard', req:{t_max:30}, bonus:{mag:1.2}, desc:"魔攻+20%", priority:2, skill:{name:"Fireball", type:"mag", cd:8, pwr:2.2, acc:1.0, desc:"大爆発"} },
     
-    // D-Axis
-    { id:'guardian', name:'Guardian', req:{d_min:65}, bonus:{def:0.8}, desc:"被ダメ-20%", priority:2, skill:{name:"IronWall", type:"def", cd:15, pwr:0, acc:1.0, desc:"完全防御(1T)"} },
-    { id:'rogue', name:'Rogue', req:{d_max:35}, bonus:{eva:0.2}, desc:"回避+20%", priority:2, skill:{name:"Mug", type:"phys", cd:6, pwr:1.0, acc:1.0, desc:"確定強奪"} },
+    // D-Axis (70)
+    { id:'guardian', name:'Guardian', req:{d_min:70}, bonus:{def:0.8}, desc:"被ダメ-20%", priority:2, skill:{name:"IronWall", type:"def", cd:15, pwr:0, acc:1.0, desc:"完全防御(1T)"} },
+    { id:'rogue', name:'Rogue', req:{d_max:30}, bonus:{eva:0.2}, desc:"回避+20%", priority:2, skill:{name:"Mug", type:"phys", cd:6, pwr:1.0, acc:1.0, desc:"確定強奪"} },
     
-    // R-Axis
-    { id:'sniper', name:'Sniper', req:{r_min:65}, bonus:{crit:0.2}, desc:"Crit+20%", priority:2, skill:{name:"Headshot", type:"phys", cd:8, pwr:1.8, acc:1.0, desc:"確定クリティカル"} },
-    { id:'cleric', name:'Cleric', req:{r_max:35}, bonus:{heal:1.3}, desc:"回復+30%", priority:2, skill:{name:"Pray", type:"heal", cd:12, pwr:0, acc:1.0, desc:"特大回復"} },
+    // R-Axis (70)
+    { id:'sniper', name:'Sniper', req:{r_min:70}, bonus:{crit:0.2}, desc:"Crit+20%", priority:2, skill:{name:"Headshot", type:"phys", cd:8, pwr:1.8, acc:1.0, desc:"確定クリティカル"} },
+    { id:'cleric', name:'Cleric', req:{r_max:30}, bonus:{heal:1.3}, desc:"回復+30%", priority:2, skill:{name:"Pray", type:"heal", cd:12, pwr:0, acc:1.0, desc:"特大回復"} },
     
-    // Hybrid
-    { id:'paladin', name:'Paladin', req:{t_min:65, d_min:65}, bonus:{phys:1.1, def:0.85}, desc:"物+10% 耐-15%", priority:2, skill:{name:"HolyBlade", type:"hyb", cd:10, pwr:2.2, acc:1.0, desc:"聖なる剣(対霊特効)"} },
-    { id:'assassin', name:'Assassin', req:{t_min:65, d_max:35}, bonus:{phys:1.1, crit:0.1}, desc:"物+10% Crit+10%", priority:2, skill:{name:"Backstab", type:"phys", cd:10, pwr:2.0, acc:1.0, desc:"背後から一撃"} },
-    { id:'sage', name:'Sage', req:{t_max:35, r_max:35}, bonus:{mag:1.1, heal:1.2}, desc:"魔+10% 回+20%", priority:2, skill:{name:"BigBang", type:"mag", cd:15, pwr:3.0, acc:1.0, desc:"究極魔法"} },
-    { id:'sentinel', name:'Sentinel', req:{d_min:65, r_max:35}, bonus:{def:0.7, time:1}, desc:"耐-30% 撃破時時+1", priority:2, skill:{name:"Aegis", type:"buff", cd:12, pwr:0, acc:1.0, desc:"絶対防御壁"} },
-    { id:'reaper', name:'Reaper', req:{t_max:35, r_min:65}, bonus:{mag:1.1, crit:0.1}, desc:"魔+10% 即死使い", priority:2, skill:{name:"Execution", type:"mag", cd:12, pwr:1.0, acc:0.9, desc:"確率即死", isInstantDeath:true} },
+    // Hybrid (70)
+    { id:'paladin', name:'Paladin', req:{t_min:70, d_min:70}, bonus:{phys:1.1, def:0.85}, desc:"物+10% 耐-15%", priority:2, skill:{name:"HolyBlade", type:"hyb", cd:10, pwr:2.2, acc:1.0, desc:"聖なる剣(対霊特効)"} },
+    { id:'assassin', name:'Assassin', req:{t_min:70, d_max:30}, bonus:{phys:1.1, crit:0.1}, desc:"物+10% Crit+10%", priority:2, skill:{name:"Backstab", type:"phys", cd:10, pwr:2.0, acc:1.0, desc:"背後から一撃"} },
+    { id:'sage', name:'Sage', req:{t_max:30, r_max:30}, bonus:{mag:1.1, heal:1.2}, desc:"魔+10% 回+20%", priority:2, skill:{name:"BigBang", type:"mag", cd:15, pwr:3.0, acc:1.0, desc:"究極魔法"} },
+    { id:'sentinel', name:'Sentinel', req:{d_min:70, r_max:30}, bonus:{def:0.7, time:1}, desc:"耐-30% 撃破時時+1", priority:2, skill:{name:"Aegis", type:"buff", cd:12, pwr:0, acc:1.0, desc:"絶対防御壁"} },
+    { id:'reaper', name:'Reaper', req:{t_max:30, r_min:70}, bonus:{mag:1.1, crit:0.1}, desc:"魔+10% 即死使い", priority:2, skill:{name:"Execution", type:"mag", cd:12, pwr:1.0, acc:0.9, desc:"確率即死", isInstantDeath:true} },
 
-    // High Tier
-    { id:'samurai', name:'Samurai', req:{t_min:80, r_min:80}, bonus:{phys:1.3, crit:0.2}, desc:"物+30% Crit+20%", priority:3, skill:{name:"Zantetsu", type:"phys", cd:15, pwr:3.5, acc:1.0, desc:"一撃必殺"} },
-    { id:'archmage', name:'Archmage', req:{t_max:20, r_max:20}, bonus:{mag:1.3, heal:1.3}, desc:"魔+30% 回+30%", priority:3, skill:{name:"Meteor", type:"mag", cd:18, pwr:4.0, acc:1.0, desc:"隕石召喚"} },
-    { id:'ninja', name:'Ninja', req:{d_max:20, r_min:80}, bonus:{eva:0.25, crit:0.2}, desc:"避+25% Crit+20%", priority:3, skill:{name:"Assassinate", type:"phys", cd:12, pwr:2.2, acc:1.0, desc:"即死攻撃", isInstantDeath:true} }
+    // High Tier (85)
+    { id:'samurai', name:'Samurai', req:{t_min:85, r_min:85}, bonus:{phys:1.3, crit:0.2}, desc:"物+30% Crit+20%", priority:3, skill:{name:"Zantetsu", type:"phys", cd:15, pwr:3.5, acc:1.0, desc:"一撃必殺"} },
+    { id:'archmage', name:'Archmage', req:{t_max:15, r_max:15}, bonus:{mag:1.3, heal:1.3}, desc:"魔+30% 回+30%", priority:3, skill:{name:"Meteor", type:"mag", cd:18, pwr:4.0, acc:1.0, desc:"隕石召喚"} },
+    { id:'ninja', name:'Ninja', req:{d_max:15, r_min:85}, bonus:{eva:0.25, crit:0.2}, desc:"避+25% Crit+20%", priority:3, skill:{name:"Assassinate", type:"phys", cd:12, pwr:2.2, acc:1.0, desc:"即死攻撃", isInstantDeath:true} }
 ];
 
 const ENEMY_TYPES = [
@@ -70,7 +72,7 @@ const INITIAL_G = {
 let g = JSON.parse(JSON.stringify(INITIAL_G));
 g.currentJob = JOBS[0];
 
-// --- Global Functions ---
+// --- Functions ---
 
 function saveGame() {
     if(g.gameOver) return;
@@ -108,7 +110,7 @@ function updateJob() {
             if(g.lv < j.req.lv_min) continue;
         }
         if(j.req) {
-            if(j.req.t_min!==undefined && t<=j.req.t_min) continue;
+            if(j.req.t_min!==undefined && t<=j.req.t_min) continue; // > check
             if(j.req.t_max!==undefined && t>=j.req.t_max) continue;
             if(j.req.d_min!==undefined && d<=j.req.d_min) continue;
             if(j.req.d_max!==undefined && d>=j.req.d_max) continue;
@@ -136,8 +138,9 @@ function getDeck() {
     }
     const deck = [basic];
 
-    if(t>60) deck.push({id:'smash', name:"Smash", type:"phys", mp:4, pwr:1.7, acc:0.75, cap:0.7, desc:"強打(70%)"});
-    else if(t<40) deck.push({id:'ice', name:"IceBolt", type:"mag", mp:12, pwr:1.3, acc:1.0, desc:"氷魔法"});
+    // Skill Req: 60
+    if(t>60) deck.push({id:'smash', name:"Smash", type:"phys", mp:4, pwr:1.7, acc:0.75, cap:0.7, desc:"強打(最大70%)"});
+    else if(t<40) deck.push({id:'ice', name:"IceBolt", type:"mag", mp:8, pwr:1.3, acc:1.0, desc:"氷魔法"});
     else deck.push({id:'fire', name:"FireBlade", type:"hyb", mp:8, pwr:1.5, acc:0.95, desc:"炎剣"});
     
     if(d>60) deck.push({id:'guard', name:"Guard", type:"def", mp:0, pwr:0, acc:1.0, desc:"防御"});
@@ -160,20 +163,17 @@ function calcHit(acc, type, s, cap) {
     if(cap !== undefined) res = Math.min(res, cap);
     return res;
 }
-
-// --- NaN修正箇所: skを受け取って分解する ---
 function calcDmg(sk, s) {
     const type = sk.type;
     const pwr = sk.pwr;
-
     if(type==='heal'||type==='def'||type==='buff') return {min:0,max:0};
+    
     let base = 0;
     if(type==='phys') base=s.STR; else if(type==='mag') base=s.INT; else if(type==='hyb') base=(s.STR+s.INT)*0.6;
     else if(type==='bomb') return {min:30, max:30};
 
     const jb = g.currentJob.bonus; let mod = 1.0;
     if(type==='phys' && jb.phys) mod *= jb.phys; if(type==='mag' && jb.mag) mod *= jb.mag;
-    
     if(g.currentJob.id === 'paladin' && g.enemy.id === 'ghost' && sk.name === 'HolyBlade') mod *= 2.0;
 
     let val = Math.floor(base * pwr * mod); if(val < 1) val = 1;
@@ -190,10 +190,13 @@ function log(msg, cls="") { const d=document.createElement('div'); d.className=c
 function consumeTime(v) {
     if(g.gameOver) return false;
     g.turns -= v; 
-    if(g.jobSkillCd > 0) g.jobSkillCd = Math.max(0, g.jobSkillCd - v);
-    if(g.immortalTurns > 0) g.immortalTurns = Math.max(0, g.immortalTurns - v);
     if(g.turns<=0) { g.gameOver=true; log("寿命が尽きた...","l-red"); updateUI(); return false; } 
     return true;
+}
+function tickBattleTurns() {
+    // 戦闘中のターン経過処理 (バフ/CDのみ)
+    if(g.jobSkillCd > 0) g.jobSkillCd--;
+    if(g.immortalTurns > 0) g.immortalTurns--;
 }
 
 function actExplore() {
@@ -229,6 +232,8 @@ function actBattle(sk) {
     
     g.mp -= (sk.mp||0); 
     if(sk.cd) g.jobSkillCd = sk.cd; 
+    
+    tickBattleTurns(); // ターン進行
 
     const s = getStats();
     
@@ -256,8 +261,10 @@ function actBattle(sk) {
         log("覚醒！能力UP＆不死！","l-spd"); enemyTurn(); updateUI(); return; 
     }
     
+    // Guard logic update
     if(sk.id==='ironwall' || sk.id==='aegis' || sk.name==='Guard') { 
-        log(`${sk.name}! (防御)`,"l-grn"); enemyTurn(true); updateUI(); return; 
+        g.guardStance = (sk.id==='ironwall' || sk.id==='aegis') ? 2 : 1; // 2=Perfect, 1=Normal
+        log(`${sk.name}! (防御)`,"l-grn"); enemyTurn(); updateUI(); return; 
     }
 
     if(sk.id==='mug') {
@@ -309,27 +316,34 @@ function actBattle(sk) {
     updateUI();
 }
 
-function enemyTurn(guard=false) {
+function enemyTurn() {
     if(g.gameOver || !g.enemy || g.enemy.hp<=0) return;
     
     if(g.enemy.isStunned) {
         log("敵は動けない...","l-grn");
         g.enemy.isStunned = false;
+        // Reset guard even if enemy didn't attack
+        g.guardStance = 0;
         return;
     }
     
     const s = getStats();
     const agiDiff = Math.max(0, s.AGI - (g.enemy.lv*4));
-    if(Math.random() < agiDiff*0.01) { log("敵を置き去りにした！","l-spd"); return; }
+    if(Math.random() < agiDiff*0.01) { 
+        log("敵を置き去りにした！","l-spd"); 
+        g.guardStance = 0;
+        return; 
+    }
 
     if(g.isCharging) {
         g.isCharging = false;
         let dmg = Math.floor(g.enemy.atk * 3);
         if(g.currentJob.bonus.def) dmg = Math.floor(dmg * g.currentJob.bonus.def);
         
-        if(guard) {
-            dmg = Math.floor(dmg / 3);
-            log("防御で軽減！", "l-grn");
+        if(g.guardStance === 2) { // IronWall
+             dmg = 0; log("完全防御！(0dmg)", "l-grn");
+        } else if(g.guardStance === 1) {
+             dmg = Math.floor(dmg / 3); log("防御で軽減！", "l-grn");
         } else if(g.parryActive) { 
             g.parryActive=false; 
             const cut = 0.3 + Math.random()*0.7; 
@@ -338,13 +352,12 @@ function enemyTurn(guard=false) {
             log(`Parry! 軽減${Math.floor(cut*100)}%`,"l-blu");
             dmg = cutDmg;
             if(just) { 
-                const counter = Math.floor(s.DEX*2); 
-                log(`反撃！ ${counter}dmg`,"l-grn"); 
-                applyDamageToEnemy(counter, "Parry");
+                const counter = Math.floor(s.DEX*2); g.enemy.hp -= counter; log(`反撃！ ${counter}dmg`,"l-grn"); 
                 if(g.enemy.hp<=0){winBattle();return;} 
             }
         }
         applyDamage(dmg, true);
+        g.guardStance = 0; // Reset
         return;
     }
 
@@ -353,22 +366,21 @@ function enemyTurn(guard=false) {
 
     if(act === 'heal') {
         let h = Math.floor(g.enemy.mhp * 0.15); g.enemy.hp = Math.min(g.enemy.mhp, g.enemy.hp + h);
-        log(`再生(+${h})`, "l-red"); return;
+        log(`再生(+${h})`, "l-red"); g.guardStance = 0; return;
     }
-    if(act === 'charge') { g.isCharging = true; log(`力を溜めている...！`,"l-chg"); return; }
+    if(act === 'charge') { g.isCharging = true; log(`力を溜めている...！`,"l-chg"); g.guardStance = 0; return; }
 
     let eva = s.AGI*0.015; if(g.currentJob.bonus.eva) eva+=g.currentJob.bonus.eva;
-    if(act==='atk' && !guard && !g.parryActive && Math.random()<eva) { log("回避！","l-grn"); return; }
+    if(act==='atk' && !g.guardStance && !g.parryActive && Math.random()<eva) { log("回避！","l-grn"); return; }
 
     let dmg = 0;
     if(act === 'mag') { dmg = Math.max(5, g.enemy.atk - Math.floor(s.MND/2)); log(`呪い！`,"l-dmg"); } 
     else { dmg = Math.max(1, g.enemy.atk - Math.floor(s.VIT/3)); }
     
     if(g.currentJob.bonus.def && act==='atk') dmg = Math.floor(dmg * g.currentJob.bonus.def);
-    if(guard && act==='atk') {
-         dmg = Math.floor(dmg/2);
-         log("防御！", "l-grn");
-    }
+    
+    if(g.guardStance === 2 && act==='atk') { dmg = 0; log("完全防御！", "l-grn"); }
+    else if(g.guardStance === 1 && act==='atk') { dmg = Math.floor(dmg/2); log("防御！", "l-grn"); }
 
     if(g.parryActive && act==='atk') {
         g.parryActive = false;
@@ -377,15 +389,11 @@ function enemyTurn(guard=false) {
         const cutDmg = Math.floor(dmg * (1.0 - cut));
         log(`Parry! 軽減${Math.floor(cut*100)}%`,"l-blu");
         dmg = cutDmg;
-        if(just) { 
-            const counter = Math.floor(s.DEX*2); 
-            log(`反撃！ ${counter}dmg`,"l-grn"); 
-            applyDamageToEnemy(counter, "Parry");
-            if(g.enemy.hp<=0){winBattle();return;} 
-        }
+        if(just) { const counter = Math.floor(s.DEX*2); g.enemy.hp -= counter; log(`反撃！ ${counter}dmg`,"l-grn"); if(g.enemy.hp<=0){winBattle();return;} }
     }
 
     applyDamage(dmg);
+    g.guardStance = 0;
 }
 
 function applyDamageToEnemy(dmg, sourceName) {
@@ -395,8 +403,10 @@ function applyDamageToEnemy(dmg, sourceName) {
 
 function applyDamage(dmg, isBig=false) {
     g.hp -= dmg; 
-    if(isBig) log(`【溜め攻撃】 ${dmg}dmg!!`,"l-dmg");
-    else log(`被弾 ${dmg}dmg`,"l-dmg");
+    if(dmg > 0) {
+        if(isBig) log(`【溜め攻撃】 ${dmg}dmg!!`,"l-dmg");
+        else log(`被弾 ${dmg}dmg`,"l-dmg");
+    }
     
     if(g.hp <= 0) {
         if(g.immortalTurns > 0) {
@@ -415,7 +425,7 @@ function winBattle() {
     else { log(`勝利(+Exp${gain},寿命-2)`, "l-grn"); consumeTime(2); }
 
     // Reset states
-    g.awakening = false; g.isFocused = false; g.immortalTurns = 0;
+    g.awakening = false; g.isFocused = false; g.immortalTurns = 0; g.guardStance = 0;
 
     if(g.enemy.isBoss && g.floor===5) {
         g.state='EXPLORE'; g.enemy=null; log("中ボス撃破！6階へ","l-boss");
@@ -627,6 +637,7 @@ window.showJobGuide = function() {
     JOBS.forEach(j=>{ if(j.id==='novice')return;
         const d=document.createElement('div'); d.className="job-row "+(g.currentJob.id===j.id?"active":"");
         let r=[]; if(j.req){ if(j.req.t_min)r.push(`Hot≧${j.req.t_min}`); if(j.req.t_max)r.push(`Cool≧${100-j.req.t_max}`); if(j.req.d_min)r.push(`Deep≧${j.req.d_min}`); if(j.req.d_max)r.push(`Shallow≧${100-j.req.d_max}`); if(j.req.r_min)r.push(`Rigid≧${j.req.r_min}`); if(j.req.r_max)r.push(`Flex≧${100-j.req.r_max}`); }
+        if(j.req && j.req.lv_min) r.push(`Lv≧${j.req.lv_min}`);
         d.innerHTML=`<strong style="color:${g.currentJob.id===j.id?'#ff0':'#eee'}">${j.name}</strong> <span class="b-unique" style="font-size:0.7em; padding-left:4px;">${j.skill?j.skill.name:""}</span><span class="job-eff">${j.desc}</span><span style="font-size:0.75em; color:#aaa">条件: ${r.join(' / ')||"なし"}</span>`; l.appendChild(d);
     }); document.getElementById('modal-job').style.display='flex';
 };
