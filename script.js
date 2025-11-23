@@ -7,34 +7,23 @@ window.onerror = function(msg, url, line) {
 
 // --- 定数 ---
 const CONF = { initTurns: 150, maxFloor: 10, itemMax: 3 };
-const SAVE_KEY = 'trd_save_data_v14_guts'; // Key updated
+const SAVE_KEY = 'trd_save_data_v15_fix';
 
 const JOBS = [
-    // Middle Path
     { id:'novice', name:'Novice', req:null, bonus:{}, desc:"凡人", priority:1, skill:{name:"Guts", type:"buff", cd:15, pwr:0, acc:1.0, desc:"食いしばり(2T)"} },
     { id:'veteran', name:'Veteran', req:{lv_min:10}, bonus:{phys:1.1, mag:1.1, def:0.9}, desc:"熟練者(全能微増)", priority:1.2, skill:{name:"Guts+", type:"buff", cd:15, pwr:0, acc:1.0, desc:"食いしばり(3T)+攻UP"} },
     { id:'hero', name:'Hero', req:{lv_min:20}, bonus:{phys:1.2, mag:1.2, def:0.8, eva:0.1}, desc:"英雄(全能強化)", priority:1.5, skill:{name:"Awakening", type:"buff", cd:20, pwr:0, acc:1.0, desc:"覚醒(4T不死+全強化)"} },
-
-    // T-Axis
     { id:'warrior', name:'Warrior', req:{t_min:60}, bonus:{phys:1.2}, desc:"物攻+20%", priority:2, skill:{name:"Braver", type:"phys", cd:10, pwr:2.5, acc:0.95, desc:"必殺の一撃"} },
     { id:'wizard', name:'Wizard', req:{t_max:40}, bonus:{mag:1.2}, desc:"魔攻+20%", priority:2, skill:{name:"Fireball", type:"mag", cd:8, pwr:2.2, acc:1.0, desc:"大爆発"} },
-    
-    // D-Axis
     { id:'guardian', name:'Guardian', req:{d_min:60}, bonus:{def:0.8}, desc:"被ダメ-20%", priority:2, skill:{name:"IronWall", type:"def", cd:15, pwr:0, acc:1.0, desc:"完全防御(1T)"} },
     { id:'rogue', name:'Rogue', req:{d_max:40}, bonus:{eva:0.2}, desc:"回避+20%", priority:2, skill:{name:"Mug", type:"phys", cd:6, pwr:1.0, acc:1.0, desc:"確定強奪"} },
-    
-    // R-Axis
     { id:'sniper', name:'Sniper', req:{r_min:60}, bonus:{crit:0.2}, desc:"Crit+20%", priority:2, skill:{name:"Headshot", type:"phys", cd:8, pwr:1.8, acc:1.0, desc:"確定クリティカル"} },
     { id:'cleric', name:'Cleric', req:{r_max:40}, bonus:{heal:1.3}, desc:"回復+30%", priority:2, skill:{name:"Pray", type:"heal", cd:12, pwr:0, acc:1.0, desc:"特大回復"} },
-    
-    // Hybrid
     { id:'paladin', name:'Paladin', req:{t_min:60, d_min:60}, bonus:{phys:1.1, def:0.85}, desc:"物+10% 耐-15%", priority:2, skill:{name:"HolyBlade", type:"hyb", cd:10, pwr:2.2, acc:1.0, desc:"聖なる剣(対霊特効)"} },
     { id:'assassin', name:'Assassin', req:{t_min:60, d_max:40}, bonus:{phys:1.1, crit:0.1}, desc:"物+10% Crit+10%", priority:2, skill:{name:"Backstab", type:"phys", cd:10, pwr:2.0, acc:1.0, desc:"背後から一撃"} },
     { id:'sage', name:'Sage', req:{t_max:40, r_max:40}, bonus:{mag:1.1, heal:1.2}, desc:"魔+10% 回+20%", priority:2, skill:{name:"BigBang", type:"mag", cd:15, pwr:3.0, acc:1.0, desc:"究極魔法"} },
     { id:'sentinel', name:'Sentinel', req:{d_min:60, r_max:40}, bonus:{def:0.7, time:1}, desc:"耐-30% 撃破時時+1", priority:2, skill:{name:"Aegis", type:"buff", cd:12, pwr:0, acc:1.0, desc:"絶対防御壁"} },
     { id:'reaper', name:'Reaper', req:{t_max:40, r_min:60}, bonus:{mag:1.1, crit:0.1}, desc:"魔+10% 即死使い", priority:2, skill:{name:"Execution", type:"mag", cd:12, pwr:1.0, acc:0.9, desc:"確率即死", isInstantDeath:true} },
-
-    // High Tier
     { id:'samurai', name:'Samurai', req:{t_min:80, r_min:80}, bonus:{phys:1.3, crit:0.2}, desc:"物+30% Crit+20%", priority:3, skill:{name:"Zantetsu", type:"phys", cd:15, pwr:3.5, acc:1.0, desc:"一撃必殺"} },
     { id:'archmage', name:'Archmage', req:{t_max:20, r_max:20}, bonus:{mag:1.3, heal:1.3}, desc:"魔+30% 回+30%", priority:3, skill:{name:"Meteor", type:"mag", cd:18, pwr:4.0, acc:1.0, desc:"隕石召喚"} },
     { id:'ninja', name:'Ninja', req:{d_max:20, r_min:80}, bonus:{eva:0.25, crit:0.2}, desc:"避+25% Crit+20%", priority:3, skill:{name:"Assassinate", type:"phys", cd:12, pwr:2.2, acc:1.0, desc:"即死攻撃", isInstantDeath:true} }
@@ -70,7 +59,8 @@ const INITIAL_G = {
 let g = JSON.parse(JSON.stringify(INITIAL_G));
 g.currentJob = JOBS[0];
 
-// --- Save/Load ---
+// --- Global Functions ---
+
 function saveGame() {
     if(g.gameOver) return;
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(g)); log("記録しました", "l-sys"); }
@@ -90,10 +80,9 @@ function resetGame() {
     localStorage.removeItem(SAVE_KEY); location.reload();
 }
 
-// --- Logic ---
 function getStats() {
     let b = 5 + (g.lv * 1.0); 
-    if(g.awakening) b *= 1.5; // Awakening Effect
+    if(g.awakening) b *= 1.5;
     const a = g.axis;
     return {
         STR: Math.floor(b * (a.T/50)), INT: Math.floor(b * ((100-a.T)/50)),
@@ -137,7 +126,7 @@ function getDeck() {
     const deck = [basic];
 
     if(t>60) deck.push({id:'smash', name:"Smash", type:"phys", mp:4, pwr:1.7, acc:0.75, cap:0.7, desc:"強打(70%)"});
-    else if(t<40) deck.push({id:'ice', name:"IceBolt", type:"mag", mp:12, pwr:1.3, acc:1.0, desc:"氷魔法"});
+    else if(t<40) deck.push({id:'ice', name:"IceBolt", type:"mag", mp:8, pwr:1.3, acc:1.0, desc:"氷魔法"});
     else deck.push({id:'fire', name:"FireBlade", type:"hyb", mp:8, pwr:1.5, acc:0.95, desc:"炎剣"});
     
     if(d>60) deck.push({id:'guard', name:"Guard", type:"def", mp:0, pwr:0, acc:1.0, desc:"防御"});
@@ -169,7 +158,6 @@ function calcDmg(pwr, type, s) {
     const jb = g.currentJob.bonus; let mod = 1.0;
     if(type==='phys' && jb.phys) mod *= jb.phys; if(type==='mag' && jb.mag) mod *= jb.mag;
     
-    // Paladin bonus
     if(g.currentJob.id === 'paladin' && g.enemy.id === 'ghost') mod *= 2.0;
 
     let val = Math.floor(base * pwr * mod); if(val < 1) val = 1;
@@ -260,9 +248,9 @@ function actBattle(sk) {
         const hit = calcHit(sk.acc, sk.type, s);
         if(Math.random() > hit) log("ミス！","l-gry");
         else {
-            const d = calcDmg(sk.pwr, sk.type, s);
+            const d = calcDmg(sk, s);
             let dmg = Math.floor(d.min + Math.random()*(d.max-d.min));
-            g.enemy.hp -= dmg; log(`${sk.name}! ${dmg}dmg`,"l-blu");
+            applyDamageToEnemy(dmg, sk.name);
             const items = Object.keys(ITEM_DATA);
             const it = items[Math.floor(Math.random()*items.length)];
             if(g.items[it] < CONF.itemMax) { g.items[it]++; log(`盗んだ！${ITEM_DATA[it].name}`,"l-yel"); }
@@ -272,26 +260,27 @@ function actBattle(sk) {
         updateUI(); return;
     }
 
+    // Instant Death
     if(sk.isInstantDeath) {
         let rate = 0.5; 
         if(g.enemy.isBoss) rate = (g.floor===5) ? 0.10 : 0.03;
         if(Math.random() < rate) {
             log(`即死発動！！ ${g.enemy.name}を葬った！`,"l-kill"); g.enemy.hp=0; winBattle(); updateUI(); return;
         } else {
-            log("即死失敗... (1dmg)","l-gry"); g.enemy.hp-=1;
+            log("即死失敗... (1dmg)","l-gry"); applyDamageToEnemy(1, "即死ミス");
         }
     } else {
         const hit = calcHit(sk.acc, sk.type, s, sk.cap);
         if(Math.random() > hit) log("ミス！","l-gry");
         else {
-            const range = calcDmg(sk.pwr, sk.type, s);
+            const range = calcDmg(sk, s);
             let dmg = Math.floor(range.min + Math.random()*(range.max-range.min+1));
             let cr=0.05; 
             if(sk.id==='snipe' || g.isFocused) cr=1.0; 
             else if(g.currentJob.bonus.crit) cr+=g.currentJob.bonus.crit;
             
             if(Math.random()<cr) { dmg=Math.floor(dmg*1.5); log("Critical!!","l-red"); }
-            g.enemy.hp -= dmg; log(`${sk.name}! ${dmg}dmg`,"l-blu");
+            applyDamageToEnemy(dmg, sk.name);
             
             if(g.isFocused) g.isFocused = false; 
         }
@@ -334,11 +323,13 @@ function enemyTurn(guard=false) {
             log(`Parry! 軽減${Math.floor(cut*100)}%`,"l-blu");
             dmg = cutDmg;
             if(just) { 
-                const counter = Math.floor(s.DEX*2); g.enemy.hp -= counter; log(`反撃！ ${counter}dmg`,"l-grn"); 
+                const counter = Math.floor(s.DEX*2); 
+                log(`反撃！ ${counter}dmg`,"l-grn");
+                applyDamageToEnemy(counter, "Parry");
                 if(g.enemy.hp<=0){winBattle();return;} 
             }
         }
-        checkDeath(dmg, true);
+        applyDamage(dmg, true);
         return;
     }
 
@@ -371,14 +362,23 @@ function enemyTurn(guard=false) {
         const cutDmg = Math.floor(dmg * (1.0 - cut));
         log(`Parry! 軽減${Math.floor(cut*100)}%`,"l-blu");
         dmg = cutDmg;
-        if(just) { const counter = Math.floor(s.DEX*2); g.enemy.hp -= counter; log(`反撃！ ${counter}dmg`,"l-grn"); if(g.enemy.hp<=0){winBattle();return;} }
+        if(just) { 
+            const counter = Math.floor(s.DEX*2); 
+            log(`反撃！ ${counter}dmg`,"l-grn"); 
+            applyDamageToEnemy(counter, "Parry");
+            if(g.enemy.hp<=0){winBattle();return;} 
+        }
     }
 
-    checkDeath(dmg);
+    applyDamage(dmg);
 }
 
-// ダメージ適用と死亡判定を分離
-function checkDeath(dmg, isBig=false) {
+function applyDamageToEnemy(dmg, sourceName) {
+    g.enemy.hp -= dmg;
+    if(sourceName !== "Parry") log(`${sourceName}! ${dmg}dmg`, "l-blu"); 
+}
+
+function applyDamage(dmg, isBig=false) {
     g.hp -= dmg; 
     if(isBig) log(`【溜め攻撃】 ${dmg}dmg!!`,"l-dmg");
     else log(`被弾 ${dmg}dmg`,"l-dmg");
@@ -431,7 +431,7 @@ function actInspect() { if(g.gameOver) return; if(g.mp<2){log("MP不足","l-gry"
 function actDisarm() { if(g.gameOver) return; if(g.mp<3){log("MP不足","l-gry");return;} g.mp-=3; const s=getStats(); if(Math.random()<(30+s.DEX*2)/100) { log("解除成功","l-grn"); g.chest.trap=false; actOpen(false); } else { log("失敗!","l-red"); actOpen(true); } }
 function actOpen(f) {
     if(g.gameOver) return;
-    if(g.chest.trap||f) { const d=10+g.floor*2; checkDeath(d, true); if(g.gameOver){ updateUI(); return; } }
+    if(g.chest.trap||f) { const d=10+g.floor*2; applyDamage(d, true); if(g.gameOver){ updateUI(); return; } }
     
     const it = g.chest.item;
     if(it === 'clock') { g.turns = Math.min(g.maxTurns, g.turns + 10); log("時計発見! 寿命+10", "l-yel"); }
@@ -450,7 +450,7 @@ function useItem(k) {
     if(d.type==='heal') { g.hp=Math.min(g.mhp, g.hp+d.val); log("HP回復","l-grn"); }
     if(d.type==='mp') { g.mp=Math.min(g.mmp, g.mp+d.val); log("MP回復","l-grn"); }
     if(d.type==='turn') { g.turns+=d.val; log("寿命延長","l-grn"); }
-    if(d.type==='dmg') { g.enemy.hp-=d.val; log(`爆弾 ${d.val}dmg`,"l-blu"); if(g.enemy.hp<=0) winBattle(); else enemyTurn(); }
+    if(d.type==='dmg') { applyDamageToEnemy(d.val, "爆弾"); if(g.enemy.hp<=0) winBattle(); else enemyTurn(); }
     updateUI();
 }
 function actRest() { if(g.gameOver||!consumeTime(2)) return; const s=getStats(); g.hp=Math.min(g.mhp, g.hp+15+s.MND*2); g.mp=Math.min(g.mmp, g.mp+8+s.MND); log("休息","l-grn"); saveGame(); updateUI(); }
@@ -544,7 +544,7 @@ function renderCmd(s) {
             else if(sk.type==='def'||sk.type==='buff') pred = `<span class="b-pred">-</span>`;
             else {
                 const hit = Math.floor(calcHit(sk.acc, sk.type, s, sk.cap)*100);
-                const d = calcDmg(sk.pwr, sk.type, s);
+                const d = calcDmg(sk, s);
                 pred = `<span class="b-pred">${Math.floor(hit)}% ${d.min}-${d.max}</span>`;
             }
             
@@ -612,6 +612,7 @@ window.showJobGuide = function() {
     JOBS.forEach(j=>{ if(j.id==='novice')return;
         const d=document.createElement('div'); d.className="job-row "+(g.currentJob.id===j.id?"active":"");
         let r=[]; if(j.req){ if(j.req.t_min)r.push(`Hot≧${j.req.t_min}`); if(j.req.t_max)r.push(`Cool≧${100-j.req.t_max}`); if(j.req.d_min)r.push(`Deep≧${j.req.d_min}`); if(j.req.d_max)r.push(`Shallow≧${100-j.req.d_max}`); if(j.req.r_min)r.push(`Rigid≧${j.req.r_min}`); if(j.req.r_max)r.push(`Flex≧${100-j.req.r_max}`); }
+        if(j.req && j.req.lv_min) r.push(`Lv≧${j.req.lv_min}`); // Add Lv req
         d.innerHTML=`<strong style="color:${g.currentJob.id===j.id?'#ff0':'#eee'}">${j.name}</strong> <span class="b-unique" style="font-size:0.7em; padding-left:4px;">${j.skill?j.skill.name:""}</span><span class="job-eff">${j.desc}</span><span style="font-size:0.75em; color:#aaa">条件: ${r.join(' / ')||"なし"}</span>`; l.appendChild(d);
     }); document.getElementById('modal-job').style.display='flex';
 };
