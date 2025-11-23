@@ -131,27 +131,36 @@ function updateJob() {
         g.currentJob = best;
     }
 }
+// ステータス依存スキルの判定 (60以上/40以下で習得)
 function getDeck() {
     const t=g.axis.T, d=g.axis.D, r=g.axis.R;
+    
+    // 通常攻撃の判定（魔法職は魔弾）
     let basic = {id:'atk', name:"Attack", type:"phys", mp:0, pwr:1.0, acc:0.95, desc:"通常攻撃"};
     if (['wizard','archmage','sage','reaper'].includes(g.currentJob.id)) {
-            basic = {id:'mag_atk', name:"Magic Shot", type:"mag", mp:2, pwr:0.8, acc:1.0, desc:"魔力攻撃"};
+        basic = {id:'mag_atk', name:"Magic Shot", type:"mag", mp:2, pwr:0.8, acc:1.0, desc:"魔力攻撃"};
     }
     const deck = [basic];
 
-    if(t>60) deck.push({id:'smash', name:"Smash", type:"phys", mp:4, pwr:1.7, acc:0.75, cap:0.7, desc:"強打(70%)"});
-    else if(t<40) deck.push({id:'ice', name:"IceBolt", type:"mag", mp:8, pwr:1.3, acc:1.0, desc:"氷魔法"});
+    // T軸スキル (Hot / Cool)
+    // ≧60, ≦40 にすることで「60」ぴったりでも習得可能に
+    if(t >= 60) deck.push({id:'smash', name:"Smash", type:"phys", mp:4, pwr:1.7, acc:0.75, cap:0.7, desc:"強打(70%)"});
+    else if(t <= 40) deck.push({id:'ice', name:"IceBolt", type:"mag", mp:12, pwr:1.3, acc:1.0, desc:"氷魔法"});
     else deck.push({id:'fire', name:"FireBlade", type:"hyb", mp:8, pwr:1.5, acc:0.95, desc:"炎剣"});
     
-    if(d>60) deck.push({id:'guard', name:"Guard", type:"def", mp:0, pwr:0, acc:1.0, desc:"防御"});
-    else if(d<40) deck.push({id:'trip', name:"Trip", type:"def", mp:3, pwr:0, acc:0.8, desc:"足払(行動阻止)"});
+    // D軸スキル (Deep / Shallow)
+    if(d >= 60) deck.push({id:'guard', name:"Guard", type:"def", mp:0, pwr:0, acc:1.0, desc:"防御"});
+    else if(d <= 40) deck.push({id:'trip', name:"Trip", type:"def", mp:3, pwr:0, acc:0.8, desc:"足払(行動阻止)"});
     else deck.push({id:'parry', name:"Parry", type:"buff", mp:0, pwr:0, acc:1.0, desc:"パリィ(0MP)"});
     
-    if(r>60) deck.push({id:'snipe', name:"Snipe", type:"phys", mp:4, pwr:1.0, acc:1.0, desc:"必中"});
-    else if(r<40) deck.push({id:'heal', name:"Heal", type:"heal", mp:8, pwr:0, acc:1.0, desc:"回復"});
+    // R軸スキル (Rigid / Flex)
+    if(r >= 60) deck.push({id:'snipe', name:"Snipe", type:"phys", mp:4, pwr:1.0, acc:1.0, desc:"必中"});
+    else if(r <= 40) deck.push({id:'heal', name:"Heal", type:"heal", mp:8, pwr:0, acc:1.0, desc:"回復"});
     else deck.push({id:'focus', name:"Focus", type:"buff", mp:2, pwr:0, acc:1.0, desc:"集中"});
 
+    // ジョブ固有スキルを追加
     if(g.currentJob.skill) { deck.push(g.currentJob.skill); }
+    
     return deck;
 }
 
@@ -651,3 +660,4 @@ window.onload = () => {
     if(localStorage.getItem(SAVE_KEY)) loadGame();
     else updateUI();
 };
+
