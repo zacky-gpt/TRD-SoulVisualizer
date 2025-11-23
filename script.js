@@ -7,7 +7,7 @@ window.onerror = function(msg, url, line) {
 
 // --- 定数 ---
 const CONF = { initTurns: 150, maxFloor: 10, itemMax: 3 };
-const SAVE_KEY = 'trd_save_data_v26_axis_fix'; // Key updated
+const SAVE_KEY = 'trd_save_data_v27_balance'; // Key updated
 
 const JOBS = [
     { id:'novice', name:'Novice', req:null, bonus:{}, desc:"凡人", priority:1, skill:{id:'Guts', name:"Guts", type:"buff", cd:15, pwr:0, acc:1.0, desc:"食いしばり(2T)"} },
@@ -192,8 +192,9 @@ function tickBattleTurns() {
 
 function actExplore() {
     if(g.gameOver || !consumeTime(1)) return;
+    g.searchCount = (g.searchCount||0)+1;
     
-    // イベント判定
+    // 1. Event Check
     const r = Math.random();
     let eventOccurred = false;
 
@@ -205,25 +206,33 @@ function actExplore() {
         eventOccurred=true;
     }
 
-    // 階段判定
-    g.searchCount = (g.searchCount || 0) + 1;
+    // 2. Stair Check (Pity)
+    let stairsJustFound = false;
     const findChance = g.searchCount * 0.1; 
     if(!g.stairsFound && Math.random() < findChance) {
         g.stairsFound = true;
+        stairsJustFound = true;
         if(eventOccurred) log("...そして階段も見つけた！","l-grn");
         else log(`階段を発見した！(捜索${g.searchCount}回目)`, "l-grn");
-    } else if(!eventOccurred) {
-        g.exp += 5;
-        log(`気配が強まる...(${Math.floor(findChance*100)}%)`, "l-gry");
     }
 
+    // 3. Scavenge (If nothing else happened)
+    if(!eventOccurred && !stairsJustFound) {
+        if(g.stairsFound) {
+            g.exp += 5;
+            log("瓦礫をあさった...(Exp+5)", "l-gry");
+        } else {
+            log(`気配が強まる...(${Math.floor(findChance*100)}%)`, "l-gry");
+        }
+    }
     updateUI();
 }
 
 function startBattle(fE=null) {
     let e; if(fE) e=fE;
     else { 
-        const lv=Math.floor(g.floor*1.3) + Math.floor(Math.random()*2); 
+        // Enemy Scaling: Floor * 1.8
+        const lv=Math.floor(g.floor*1.8) + Math.floor(Math.random()*2); 
         const t=ENEMY_TYPES[Math.floor(Math.random()*ENEMY_TYPES.length)]; 
         e={...t, lv:lv, type:t.id, mhp:Math.floor((20+lv*8)*t.hpMod), hp:Math.floor((20+lv*8)*t.hpMod), atk:5+lv*2}; 
     }
@@ -522,7 +531,6 @@ function updateUI() {
     document.getElementById('disp-turn').innerText = g.turns;
     document.getElementById('bar-turn').style.width = Math.max(0, (g.turns/g.maxTurns)*100)+"%";
     
-    // Update Axis Values (Reverted logic: showing affinity)
     document.getElementById('th-t').style.left = g.axis.T+"%"; 
     document.getElementById('val-t').innerText = (g.axis.T > 50 ? g.axis.T : 100 - g.axis.T);
     
