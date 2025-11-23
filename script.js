@@ -7,7 +7,7 @@ window.onerror = function(msg, url, line) {
 
 // --- 定数 ---
 const CONF = { initTurns: 150, maxFloor: 10, itemMax: 3 };
-const SAVE_KEY = 'trd_save_data_v23_precision';
+const SAVE_KEY = 'trd_save_data_v24_parallel'; // Key updated
 
 // Job Data
 const JOBS = [
@@ -63,7 +63,8 @@ const INITIAL_G = {
 let g = JSON.parse(JSON.stringify(INITIAL_G));
 g.currentJob = JOBS[0];
 
-// --- Save/Load ---
+// --- Global Functions ---
+
 function saveGame() {
     if(g.gameOver) return;
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(g)); log("記録しました", "l-sys"); }
@@ -83,7 +84,6 @@ function resetGame() {
     localStorage.removeItem(SAVE_KEY); location.reload();
 }
 
-// --- Logic ---
 function getStats() {
     let b = 5 + (g.lv * 1.0); 
     if(g.awakening) b *= 1.5;
@@ -145,20 +145,14 @@ function getDeck() {
     return deck;
 }
 
-// 必中・確クリ計算の修正
-function calcHit(sk, s) {
+function calcHit(acc, type, s, cap) {
     if(g.isFocused) return 1.0;
-    // Snipe/Headshot are absolute hit
-    if(sk.id === 'snipe' || sk.id === 'Headshot') return 1.0;
-
-    let r = sk.acc; 
-    if(sk.type==='phys'||sk.type==='hyb') r += (s.DEX * 0.01);
+    let r = acc; if(type==='phys'||type==='hyb') r += (s.DEX * 0.01);
     if(g.enemy) r -= g.enemy.eva;
     let res = Math.min(1.0, Math.max(0.0, r));
-    if(sk.cap !== undefined) res = Math.min(res, sk.cap);
+    if(cap !== undefined) res = Math.min(res, cap);
     return res;
 }
-
 function calcDmg(sk, s) {
     const type = sk.type;
     const pwr = sk.pwr;
@@ -199,25 +193,37 @@ function tickBattleTurns() {
 
 function actExplore() {
     if(g.gameOver || !consumeTime(1)) return;
-    // 階段累積確率
-    g.searchCount = (g.searchCount||0) + 1;
-    const findChance = g.searchCount * 0.1; 
-    if(!g.stairsFound && Math.random() < findChance) {
-        g.stairsFound=true; log(`階段発見(捜索${g.searchCount}回目)`,"l-grn");
-        updateUI(); return;
-    }
+    g.searchCount = (g.searchCount||0)+1;
     
+    // イベント判定 (抽選)
     const r = Math.random();
-    if(r<0.6) startBattle(); else if(r<0.7) startChest();
+    let eventOccurred = false;
+
+    if(r<0.6) { startBattle(); eventOccurred=true; }
+    else if(r<0.7) { startChest(); eventOccurred=true; }
     else if(r<0.8) {
         const k=['T','D','R'][Math.floor(Math.random()*3)]; const v=Math.random()<.5?5:-5;
         g.axis[k]=Math.max(0,Math.min(100, g.axis[k]+v)); log("磁場異常！性格変動","l-yel");
-    } else {
-        if(!g.stairsFound) log(`気配が強まる...(${Math.floor(findChance*100)}%)`,"l-gry"); 
-        else { g.exp+=5; log("瓦礫(Exp微増)","l-gry"); }
+        eventOccurred=true;
     }
+
+    // 階段判定 (並列処理)
+    // 累積確率: 1回10%
+    const findChance = g.searchCount * 0.1; 
+    if(!g.stairsFound && Math.random() < findChance) {
+        g.stairsFound = true;
+        if(eventOccurred) log("...そして階段も見つけた！","l-grn");
+        else log(`探索の末、階段発見！(捜索${g.searchCount}回)`,"l-grn");
+    } else {
+        if(!eventOccurred) {
+            g.exp += 5;
+            log(`気配が強まる...(${Math.floor(findChance*100)}%)`, "l-gry");
+        }
+    }
+
     updateUI();
 }
+
 function startBattle(fE=null) {
     let e; if(fE) e=fE;
     else { 
@@ -272,7 +278,7 @@ function actBattle(sk) {
     }
 
     if(sk.id==='Mug') {
-        const hit = calcHit(sk, s);
+        const hit = calcHit(sk.acc, sk.type, s);
         if(Math.random() > hit) log("ミス！","l-gry");
         else {
             const d = calcDmg(sk, s);
@@ -296,13 +302,13 @@ function actBattle(sk) {
             log("即死失敗... (1dmg)","l-gry"); applyDamageToEnemy(1, "即死ミス");
         }
     } else {
-        const hit = calcHit(sk, s);
+        const hit = calcHit(sk.acc, sk.type, s, sk.cap);
         if(Math.random() > hit) log("ミス！","l-gry");
         else {
             const range = calcDmg(sk, s);
             let dmg = Math.floor(range.min + Math.random()*(range.max-range.min+1));
             let cr=0.05; 
-            if(sk.id==='snipe' || sk.id==='Headshot' || g.isFocused) cr=1.0; // Absolute Crit
+            if(sk.id==='snipe' || g.isFocused) cr=1.0; 
             else if(g.currentJob.bonus.crit) cr+=g.currentJob.bonus.crit;
             
             if(Math.random()<cr) { dmg=Math.floor(dmg*1.5); log("Critical!!","l-red"); }
@@ -313,6 +319,7 @@ function actBattle(sk) {
     }
     if(g.enemy.hp <= 0) winBattle(); else enemyTurn();
     
+    // AGI Double Action
     if(!g.gameOver && g.enemy && g.enemy.hp > 0) {
         const diff = s.AGI - (g.enemy.lv * 4);
         if(Math.random() < diff*0.01) { log("再行動！","l-spd"); return; }
@@ -415,7 +422,7 @@ function applyDamage(dmg, isBig=false) {
     if(g.hp <= 0) {
         if(g.immortalTurns > 0) {
             g.hp = 1;
-            log(`食いしばった！(残${g.immortalTurns})`,"l-spd");
+            log("食いしばった！(根性)","l-spd");
         } else {
             g.gameOver = true;
             log("敗北...","l-red");
@@ -572,7 +579,7 @@ function renderCmd(s) {
             if(sk.type==='heal') pred = `<span class="b-pred">Heal</span>`;
             else if(sk.type==='def'||sk.type==='buff') pred = `<span class="b-pred">-</span>`;
             else {
-                const hit = Math.floor(calcHit(sk, s)*100);
+                const hit = Math.floor(calcHit(sk.acc, sk.type, s, sk.cap)*100);
                 const d = calcDmg(sk, s);
                 pred = `<span class="b-pred">${Math.floor(hit)}% ${d.min}-${d.max}</span>`;
             }
