@@ -7,7 +7,7 @@ window.onerror = function(msg, url, line) {
 
 // --- 定数 ---
 const CONF = { initTurns: 150, maxFloor: 10, itemMax: 3 };
-const SAVE_KEY = 'trd_save_data_v32_time_fix';
+const SAVE_KEY = 'trd_save_data_v29_mug_fix'; // Key updated
 
 const JOBS = [
     { id:'novice', name:'Novice', req:null, bonus:{}, desc:"凡人", priority:1, skill:{id:'Guts', name:"Guts", type:"buff", cd:15, pwr:0, acc:1.0, desc:"食いしばり(2T)"} },
@@ -33,20 +33,19 @@ const JOBS = [
 ];
 
 const ENEMY_TYPES = [
-    { id: 'slime', name: 'Slime', hpMod: 0.8, defMod: 1.5, mDefMod: 0.2, eva: 0, act:['atk','atk','heal'], resP:1.0, desc: '再生能力/魔法弱点' },
-    { id: 'bat', name: 'Bat', hpMod: 0.6, defMod: 0.5, mDefMod: 0.5, eva: 0.25, act:['atk'], resP:1.0, desc: '高回避' },
-    { id: 'golem', name: 'Golem', hpMod: 1.4, defMod: 1.1, mDefMod: 0.8, eva: -0.1, act:['atk','atk','charge'], resP:1.0, desc: '高耐久/タメ攻撃' },
-    { id: 'ghost', name: 'Ghost', hpMod: 0.6, defMod: 2.5, mDefMod: 0.4, eva: 0.1, act:['mag'], resP:0.1, desc: '物理耐性/呪い' },
-    { id: 'dragon', name: 'Dragon', hpMod: 2.5, defMod: 1.5, mDefMod: 1.0, eva: 0, act:['atk','mag','charge'], resP:0.8, resM:0.8, desc: '伝説の古龍' }
+    { id: 'slime', name: 'Slime', hpMod: 0.8, defMod: 1.5, mDefMod: 0.2, eva: 0, act:['atk','atk','heal'], desc: '再生能力' },
+    { id: 'bat', name: 'Bat', hpMod: 0.6, defMod: 0.5, mDefMod: 0.5, eva: 0.25, act:['atk'], desc: '高回避' },
+    { id: 'golem', name: 'Golem', hpMod: 1.4, defMod: 1.1, mDefMod: 0.8, eva: -0.1, act:['atk','atk','charge'], desc: 'タメ攻撃注意' },
+    { id: 'ghost', name: 'Ghost', hpMod: 0.6, defMod: 2.5, mDefMod: 0.4, eva: 0.1, act:['mag'], desc: '物理耐性/呪い' }
 ];
 const BOSSES = {
     5: { id:'cerberus', name:'Cerberus', hp:200, atk:15, defMod:1.0, mDefMod:1.0, eva:0.05, act:['atk','atk','charge','mag'], desc:'【中ボス】地獄の番犬' },
-    10: { id:'overlord', name:'Overlord', hp:800, atk:40, defMod:1.2, mDefMod:1.2, eva:0.1, act:['atk','mag','charge','heal'], desc:'【BOSS】螺旋の終焉' }
+    10: { id:'overlord', name:'Overlord', hp:500, atk:25, defMod:1.2, mDefMod:1.2, eva:0.1, act:['atk','mag','charge','heal'], desc:'【BOSS】螺旋の終焉' }
 };
 const ITEM_DATA = {
     potion: { name: "Potion", desc: "HP50回復", type: "heal", val: 50 },
     ether:  { name: "Ether", desc: "MP20回復", type: "mp", val: 20 },
-    bomb:   { name: "Bomb", desc: "防御無視50dmg", type: "dmg", val: 50 },
+    bomb:   { name: "Bomb", desc: "防御無視30dmg", type: "dmg", val: 30 },
     clock:  { name: "Clock", desc: "寿命+10", type: "turn", val: 10 }
 };
 
@@ -160,7 +159,7 @@ function calcDmg(sk, s) {
     if(type==='heal'||type==='def'||type==='buff') return {min:0,max:0};
     let base = 0;
     if(type==='phys') base=s.STR; else if(type==='mag') base=s.INT; else if(type==='hyb') base=(s.STR+s.INT)*0.6;
-    else if(type==='bomb') return {min:ITEM_DATA.bomb.val, max:ITEM_DATA.bomb.val};
+    else if(type==='bomb') return {min:30, max:30};
 
     const jb = g.currentJob.bonus; let mod = 1.0;
     if(type==='phys' && jb.phys) mod *= jb.phys; if(type==='mag' && jb.mag) mod *= jb.mag;
@@ -170,47 +169,32 @@ function calcDmg(sk, s) {
     let val = Math.floor(base * pwr * mod); if(val < 1) val = 1;
     if(!g.enemy) return {min:0, max:0};
     
-    // Base Resistance
-    let res = 1.0;
-    if(type==='phys') res = (g.enemy.resP!==undefined ? g.enemy.resP : 1.0);
-    if(type==='mag') res = (g.enemy.resM!==undefined ? g.enemy.resM : 1.0);
-    
-    // Level scaling res (Reduced damage from higher level enemies)
-    if(g.enemy.lv > 10) res *= (1.0 - Math.min(0.2, (g.enemy.lv-10)*0.02));
-    
-    // Hybrid penetrates slightly
-    if(type==='hyb') {
-         const resAvg = ((g.enemy.resP||1)+(g.enemy.resM||1))/2;
-         res = Math.max(resAvg, 0.8); 
-    }
-    
-    val = Math.floor(val * res);
-
-    const net = val;
+    let def = 0;
+    if(type==='phys'||type==='hyb') def=(g.enemy.lv*1.5)*(g.enemy.defMod||1); else if(type==='mag') def=(g.enemy.lv*1.0)*(g.enemy.mDefMod||1);
+    const net = Math.max(1, val - Math.floor(def/2));
     return {min:Math.floor(net*0.9), max:Math.floor(net*1.1)};
 }
 
 // Actions
 function log(msg, cls="") { const d=document.createElement('div'); d.className=cls; d.innerText=msg; document.getElementById('log-list').prepend(d); }
-// 寿命消費のみ（CD/Buffは触らない）
 function consumeTime(v) {
     if(g.gameOver) return false;
     g.turns -= v; 
+    if(g.jobSkillCd > 0) g.jobSkillCd = Math.max(0, g.jobSkillCd - v);
+    if(g.immortalTurns > 0) g.immortalTurns = Math.max(0, g.immortalTurns - v);
     if(g.turns<=0) { g.gameOver=true; log("寿命が尽きた...","l-red"); updateUI(); return false; } 
     return true;
 }
-// 時間経過処理（CD/Buffのみ）
-function tickTime() {
+function tickBattleTurns() {
     if(g.jobSkillCd > 0) g.jobSkillCd--;
     if(g.immortalTurns > 0) g.immortalTurns--;
 }
 
 function actExplore() {
     if(g.gameOver || !consumeTime(1)) return;
-    tickTime(); // 歩くとCD回復
-
     g.searchCount = (g.searchCount||0)+1;
     
+    // Event
     const r = Math.random();
     let eventOccurred = false;
 
@@ -222,9 +206,12 @@ function actExplore() {
         eventOccurred=true;
     }
 
+    // Pity Stair
+    let stairsJustFound = false;
     const findChance = g.searchCount * 0.1; 
     if(!g.stairsFound && Math.random() < findChance) {
         g.stairsFound = true;
+        stairsJustFound = true;
         if(eventOccurred) log("...そして階段も見つけた！","l-grn");
         else log(`階段を発見した！(捜索${g.searchCount}回目)`, "l-grn");
     } else if(!eventOccurred) {
@@ -237,17 +224,9 @@ function actExplore() {
 function startBattle(fE=null) {
     let e; if(fE) e=fE;
     else { 
-        let pool = [];
-        if(g.floor <= 3) pool = ['slime','bat','ghost'];
-        else if(g.floor <= 6) pool = ['bat','ghost','golem'];
-        else pool = ['ghost','golem','dragon'];
-        
-        let typeId = pool[Math.floor(Math.random()*pool.length)];
-        let t = ENEMY_TYPES.find(x => x.id === typeId);
-        if(!t && typeId === 'dragon') t = { id: 'dragon', name: 'Dragon', hpMod: 2.5, atkMod: 1.5, resP: 0.8, resM: 0.8, eva: 0, act:['atk','mag','charge'], desc: '伝説の古龍' };
-
         const lv=Math.floor(g.floor*1.8) + Math.floor(Math.random()*2); 
-        e={...t, lv:lv, type:t.id, mhp:Math.floor((20+lv*8)*t.hpMod), hp:Math.floor((20+lv*8)*t.hpMod), atk:5+lv*(t.atkMod||1.0)*2}; 
+        const t=ENEMY_TYPES[Math.floor(Math.random()*ENEMY_TYPES.length)]; 
+        e={...t, lv:lv, type:t.id, mhp:Math.floor((20+lv*8)*t.hpMod), hp:Math.floor((20+lv*8)*t.hpMod), atk:5+lv*2}; 
     }
     g.enemy=e; g.isCharging=false; g.isStunned=false; g.parryActive=false; g.isFocused=false; g.guardStance=0;
     g.state = 'BATTLE';
@@ -264,17 +243,15 @@ function actBattle(sk) {
     if(g.gameOver || !g.enemy || g.enemy.hp<=0 || g.state!=='BATTLE') return;
     if(sk.cd && g.jobSkillCd > 0) { log(`充填中... (あと${g.jobSkillCd}T)`,"l-gry"); return; }
     
-    // 戦闘行動：寿命消費なし
     g.mp -= (sk.mp||0); 
     if(sk.cd) g.jobSkillCd = sk.cd; 
+    
+    tickBattleTurns(); 
 
     const s = getStats();
     
     if(sk.type==='heal') {
-        const v = Math.floor((20*g.currentJob.bonus.heal||20)+s.MND*2); g.hp=Math.min(g.mhp, g.hp+v); log(`HP${v}回復`,"l-grn"); 
-        // Player turn ends, Time flows (CD/Buff)
-        tickTime(); 
-        enemyTurn(); updateUI(); return;
+        const v = Math.floor((20*g.currentJob.bonus.heal||20)+s.MND*2); g.hp=Math.min(g.mhp, g.hp+v); log(`HP${v}回復`,"l-grn"); enemyTurn(); updateUI(); return;
     }
     if(sk.id==='trip') {
         if(Math.random() < 0.8) { 
@@ -282,25 +259,24 @@ function actBattle(sk) {
             if(g.isCharging){ g.isCharging=false; log("足払い！ため解除！","l-grn"); }
             else log("足払い成功！","l-grn"); 
         } else log("足払い失敗","l-gry");
-        tickTime();
         enemyTurn(); updateUI(); return;
     }
-    if(sk.id==='parry') { g.parryActive = true; log("構えた！(Parry)","l-grn"); tickTime(); enemyTurn(); updateUI(); return; }
-    if(sk.id==='focus') { g.isFocused = true; log("集中！(次回必中Crit)","l-grn"); tickTime(); enemyTurn(); updateUI(); return; }
+    if(sk.id==='parry') { g.parryActive = true; log("構えた！(Parry)","l-grn"); enemyTurn(); updateUI(); return; }
+    if(sk.id==='focus') { g.isFocused = true; log("集中！(次回必中Crit)","l-grn"); enemyTurn(); updateUI(); return; }
     
     if(sk.id==='Guts' || sk.id==='Guts+') { 
         g.immortalTurns = sk.id==='Guts'?3:4; 
         if(sk.id==='Guts+') g.awakening=true; 
-        log("ド根性！食いしばり付与","l-grn"); tickTime(); enemyTurn(); updateUI(); return; 
+        log("ド根性！食いしばり付与","l-grn"); enemyTurn(); updateUI(); return; 
     }
     if(sk.id==='Awakening') { 
         g.immortalTurns = 5; g.awakening=true; 
-        log("覚醒！能力UP＆不死！","l-spd"); tickTime(); enemyTurn(); updateUI(); return; 
+        log("覚醒！能力UP＆不死！","l-spd"); enemyTurn(); updateUI(); return; 
     }
     
     if(sk.id==='IronWall' || sk.id==='Aegis' || sk.name==='Guard') { 
         g.guardStance = (sk.id==='IronWall' || sk.id==='Aegis') ? 2 : 1; 
-        log(`${sk.name}! (防御)`,"l-grn"); tickTime(); enemyTurn(); updateUI(); return; 
+        log(`${sk.name}! (防御)`,"l-grn"); enemyTurn(); updateUI(); return; 
     }
 
     if(sk.id==='Mug') {
@@ -310,13 +286,12 @@ function actBattle(sk) {
             const d = calcDmg(sk, s);
             let dmg = Math.floor(d.min + Math.random()*(d.max-d.min));
             applyDamageToEnemy(dmg, sk.name);
-            const items = Object.keys(ITEM_DATA);
+            const items = Object.keys(ITEM_DATA).filter(k => k !== 'clock'); // CLOCK EXCLUDED!
             const it = items[Math.floor(Math.random()*items.length)];
             if(g.items[it] < CONF.itemMax) { g.items[it]++; log(`盗んだ！${ITEM_DATA[it].name}`,"l-yel"); }
             else log(`盗んだが持てない`,"l-gry");
         }
-        if(g.enemy.hp <= 0) winBattle(); 
-        else { tickTime(); enemyTurn(); }
+        if(g.enemy.hp <= 0) winBattle(); else enemyTurn();
         updateUI(); return;
     }
 
@@ -344,17 +319,11 @@ function actBattle(sk) {
             if(g.isFocused) g.isFocused = false; 
         }
     }
-    if(g.enemy.hp <= 0) winBattle(); 
-    else {
-        // AGI Double Action Check
+    if(g.enemy.hp <= 0) winBattle(); else enemyTurn();
+    
+    if(!g.gameOver && g.enemy && g.enemy.hp > 0) {
         const diff = s.AGI - (g.enemy.lv * 4);
-        if(!g.gameOver && Math.random() < diff*0.01) { 
-             log("再行動！","l-spd"); 
-             // No tickTime, No enemyTurn
-             return; 
-        }
-        tickTime();
-        enemyTurn();
+        if(Math.random() < diff*0.01) { log("再行動！","l-spd"); return; }
     }
     updateUI();
 }
@@ -366,13 +335,13 @@ function enemyTurn(guard=false) {
         log("敵は動けない...","l-grn");
         g.enemy.isStunned = false;
         g.guardStance = 0;
+        tickBattleTurns();
         return;
     }
     
     const s = getStats();
-    // Enemy miss turn via AGI
     const agiDiff = Math.max(0, s.AGI - (g.enemy.lv*4));
-    if(Math.random() < agiDiff*0.025) { 
+    if(Math.random() < agiDiff*0.01) { 
         log("敵を置き去りにした！","l-spd"); 
         g.guardStance = 0;
         return; 
@@ -399,6 +368,7 @@ function enemyTurn(guard=false) {
         }
         applyDamage(dmg, true);
         g.guardStance = 0;
+        tickBattleTurns();
         return;
     }
 
@@ -407,18 +377,19 @@ function enemyTurn(guard=false) {
 
     if(act === 'heal') {
         let h = Math.floor(g.enemy.mhp * 0.15); g.enemy.hp = Math.min(g.enemy.mhp, g.enemy.hp + h);
-        log(`再生(+${h})`, "l-red"); g.guardStance = 0; return;
+        log(`再生(+${h})`, "l-red"); g.guardStance = 0; tickBattleTurns(); return;
     }
-    if(act === 'charge') { g.isCharging = true; log(`力を溜めている...！`,"l-chg"); g.guardStance = 0; return; }
+    if(act === 'charge') { g.isCharging = true; log(`力を溜めている...！`,"l-chg"); g.guardStance = 0; tickBattleTurns(); return; }
 
     let eva = s.AGI*0.015; if(g.currentJob.bonus.eva) eva+=g.currentJob.bonus.eva;
-    if(act==='atk' && !g.guardStance && !g.parryActive && Math.random()<eva) { log("回避！","l-grn"); return; }
+    if(act==='atk' && !g.guardStance && !g.parryActive && Math.random()<eva) { log("回避！","l-grn"); tickBattleTurns(); return; }
 
     let dmg = 0;
     if(act === 'mag') { dmg = Math.max(5, g.enemy.atk - Math.floor(s.MND/2)); log(`呪い！`,"l-dmg"); } 
     else { dmg = Math.max(1, g.enemy.atk - Math.floor(s.VIT/3)); }
     
     if(g.currentJob.bonus.def && act==='atk') dmg = Math.floor(dmg * g.currentJob.bonus.def);
+    
     if(g.guardStance === 2 && act==='atk') { dmg = 0; log("完全防御！", "l-grn"); }
     else if(g.guardStance === 1 && act==='atk') { dmg = Math.floor(dmg/2); log("防御！", "l-grn"); }
 
@@ -434,32 +405,28 @@ function enemyTurn(guard=false) {
 
     applyDamage(dmg);
     g.guardStance = 0;
+    tickBattleTurns();
 }
 
-function applyDamageToEnemy(dmg, sourceName, type='phys') {
-    // Reflection
-    if(g.enemy.reflect && g.enemy.reflect > 0 && type === 'phys') {
-        const recoil = Math.floor(dmg * g.enemy.reflect);
-        if(recoil > 0) {
-            log(`反射！ ${recoil}dmgを受けた`,"l-red");
-            applyDamage(recoil);
-            if(g.gameOver) return;
-        }
-    }
+function applyDamageToEnemy(dmg, sourceName) {
     g.enemy.hp -= dmg;
-    if(sourceName !== "Parry" && sourceName !== "Counter" && sourceName !== "JustParry") log(`${sourceName}! ${dmg}dmg`, "l-blu"); 
+    if(sourceName !== "Parry") log(`${sourceName}! ${dmg}dmg`, "l-blu"); 
 }
 
+// 修正版: 必ず整数化 & ガッツ判定を最後に行う
 function applyDamage(dmg, isBig=false) {
     dmg = Math.floor(dmg);
     g.hp -= dmg; 
+    
     if(dmg > 0) {
         if(isBig) log(`【溜め攻撃】 ${dmg}dmg!!`,"l-dmg");
         else log(`被弾 ${dmg}dmg`,"l-dmg");
     }
     
     g.hp = Math.floor(g.hp);
+
     if(g.hp <= 0) {
+        // ここでガッツ判定！
         if(g.immortalTurns > 0) {
             g.hp = 1;
             log(`食いしばった！(残${g.immortalTurns})`,"l-spd");
@@ -473,7 +440,6 @@ function applyDamage(dmg, isBig=false) {
 
 function winBattle() {
     const gain = 15 + g.enemy.lv*5; g.exp+=gain;
-    // Win Cost: 2 Turns (unless Sentinel bonus)
     if(g.currentJob.bonus.time) { g.turns = Math.min(g.maxTurns, g.turns+1); log(`勝利(+Exp${gain},寿命+1)`, "l-grn"); }
     else { log(`勝利(+Exp${gain},寿命-2)`, "l-grn"); consumeTime(2); }
 
@@ -531,7 +497,7 @@ function useItem(k) {
     if(d.type==='dmg') { applyDamageToEnemy(d.val, "爆弾", "mag"); if(g.enemy.hp<=0) winBattle(); else enemyTurn(); }
     updateUI();
 }
-function actRest() { if(g.gameOver||!consumeTime(2)) return; const s=getStats(); g.hp=Math.min(g.mhp, g.hp+15+s.MND*2); g.mp=Math.min(g.mmp, g.mp+8+s.MND); log("休息","l-grn"); tickTime(); saveGame(); updateUI(); } // tickTime added
+function actRest() { if(g.gameOver||!consumeTime(2)) return; const s=getStats(); g.hp=Math.min(g.mhp, g.hp+15+s.MND*2); g.mp=Math.min(g.mmp, g.mp+8+s.MND); log("休息","l-grn"); saveGame(); updateUI(); }
 function actDescend() {
     if(g.gameOver) return;
     if(g.floor===5) { startBattle({ ...BOSSES[5], lv:10, isBoss:true, mhp:BOSSES[5].hp }); return; }
