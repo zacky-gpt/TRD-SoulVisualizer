@@ -239,6 +239,7 @@ function startChest() {
     updateUI(); 
 }
 
+// --- 修正箇所：actBattle ---
 function actBattle(sk) {
     if(g.gameOver || !g.enemy || g.enemy.hp<=0 || g.state!=='BATTLE') return;
     if(sk.cd && g.jobSkillCd > 0) { log(`充填中... (あと${g.jobSkillCd}T)`,"l-gry"); return; }
@@ -250,8 +251,11 @@ function actBattle(sk) {
 
     const s = getStats();
     
+    // --- Player Action ---
     if(sk.type==='heal') {
-        const v = Math.floor((20*g.currentJob.bonus.heal||20)+s.MND*2); g.hp=Math.min(g.mhp, g.hp+v); log(`HP${v}回復`,"l-grn"); enemyTurn(); updateUI(); return;
+        const v = Math.floor((20*g.currentJob.bonus.heal||20)+s.MND*2); g.hp=Math.min(g.mhp, g.hp+v); log(`HP${v}回復`,"l-grn"); 
+        // 回復後は確定で敵のターンへ
+        enemyTurn(); updateUI(); return;
     }
     if(sk.id==='trip') {
         if(Math.random() < 0.8) { 
@@ -286,16 +290,12 @@ function actBattle(sk) {
             const d = calcDmg(sk, s);
             let dmg = Math.floor(d.min + Math.random()*(d.max-d.min));
             applyDamageToEnemy(dmg, sk.name);
-            const items = Object.keys(ITEM_DATA).filter(k => k !== 'clock'); // CLOCK EXCLUDED!
+            const items = Object.keys(ITEM_DATA).filter(k => k !== 'clock');
             const it = items[Math.floor(Math.random()*items.length)];
             if(g.items[it] < CONF.itemMax) { g.items[it]++; log(`盗んだ！${ITEM_DATA[it].name}`,"l-yel"); }
             else log(`盗んだが持てない`,"l-gry");
         }
-        if(g.enemy.hp <= 0) winBattle(); else enemyTurn();
-        updateUI(); return;
-    }
-
-    if(sk.isInstantDeath) {
+    } else if(sk.isInstantDeath) {
         let rate = 0.5; 
         if(g.enemy.isBoss) rate = (g.floor===5) ? 0.10 : 0.03;
         if(Math.random() < rate) {
@@ -304,6 +304,7 @@ function actBattle(sk) {
             log("即死失敗... (1dmg)","l-gry"); applyDamageToEnemy(1, "即死ミス");
         }
     } else {
+        // Normal Attack / Skill
         const hit = calcHit(sk.acc, sk.type, s, sk.cap);
         if(Math.random() > hit) log("ミス！","l-gry");
         else {
@@ -313,21 +314,41 @@ function actBattle(sk) {
             if(sk.id==='snipe' || g.isFocused) cr=1.0; 
             else if(g.currentJob.bonus.crit) cr+=g.currentJob.bonus.crit;
             
-            if(Math.random()<cr) { dmg=Math.floor(dmg*1.5); log("Critical!!","l-red"); }
-            applyDamageToEnemy(dmg, sk.name);
+            // DEX Scaling Crit
+            let critMult = 1.5 + (s.DEX * 0.01);
+            if(Math.random()<cr) { dmg=Math.floor(dmg*critMult); log(`Critical(x${critMult.toFixed(1)})!!`,"l-red"); }
+            applyDamageToEnemy(dmg, sk.name, sk.type);
             
             if(g.isFocused) g.isFocused = false; 
         }
     }
-    if(g.enemy.hp <= 0) winBattle(); else enemyTurn();
+
+    // 敵死亡判定
+    if(g.enemy.hp <= 0) { winBattle(); updateUI(); return; }
+
+    // --- AGI Re-Act Check (修正版) ---
+    // 敵のターンを呼ぶ前にチェックする！
+    // 基準: 敵Lv*2 (Lv10の敵ならAGI20でトントン、AGI50なら60%再行動)
+    const speedReq = g.enemy.lv * 2; 
+    const speedDiff = s.AGI - speedReq;
     
-    if(!g.gameOver && g.enemy && g.enemy.hp > 0) {
-        const diff = s.AGI - (g.enemy.lv * 4);
-        if(Math.random() < diff*0.01) { log("再行動！","l-spd"); return; }
+    if(speedDiff > 0) {
+        // 差分1につき2%の確率で再行動
+        const chance = speedDiff * 0.02;
+        if(Math.random() < chance) {
+            log(">>> 高速機動！再行動！(AGI)", "l-spd");
+            // enemyTurn() を呼ばずに終了（＝ずっと俺のターン）
+            updateUI();
+            return; 
+        }
     }
+
+    // 再行動できなければ敵のターン
+    enemyTurn();
     updateUI();
 }
 
+// --- 修正箇所：enemyTurn (重複していたAGI判定を削除) ---
 function enemyTurn(guard=false) {
     if(g.gameOver || !g.enemy || g.enemy.hp<=0) return;
     
@@ -339,17 +360,13 @@ function enemyTurn(guard=false) {
         return;
     }
     
+    // ※ここにあった古いAGI判定は削除しました（actBattle側に統合）
+
     const s = getStats();
-    const agiDiff = Math.max(0, s.AGI - (g.enemy.lv*4));
-    if(Math.random() < agiDiff*0.01) { 
-        log("敵を置き去りにした！","l-spd"); 
-        g.guardStance = 0;
-        return; 
-    }
 
     if(g.isCharging) {
         g.isCharging = false;
-        let dmg = Math.floor(g.enemy.atk * 3);
+        let dmg = Math.floor(g.enemy.atk * 2.5);
         if(g.currentJob.bonus.def) dmg = Math.floor(dmg * g.currentJob.bonus.def);
         
         if(g.guardStance === 2) { dmg = 0; log("完全防御！(0dmg)", "l-grn"); }
@@ -362,7 +379,7 @@ function enemyTurn(guard=false) {
             log(`Parry! 軽減${Math.floor(cut*100)}%`,"l-blu");
             dmg = cutDmg;
             if(just) { 
-                const counter = Math.floor(s.DEX*2); g.enemy.hp -= counter; log(`反撃！ ${counter}dmg`,"l-grn"); 
+                const counter = Math.floor(s.DEX*2); applyDamageToEnemy(counter, "JustParry"); log(`反撃！ ${counter}dmg`,"l-grn"); 
                 if(g.enemy.hp<=0){winBattle();return;} 
             }
         }
@@ -381,17 +398,27 @@ function enemyTurn(guard=false) {
     }
     if(act === 'charge') { g.isCharging = true; log(`力を溜めている...！`,"l-chg"); g.guardStance = 0; tickBattleTurns(); return; }
 
-    let eva = s.AGI*0.015; if(g.currentJob.bonus.eva) eva+=g.currentJob.bonus.eva;
-    if(act==='atk' && !g.guardStance && !g.parryActive && Math.random()<eva) { log("回避！","l-grn"); tickBattleTurns(); return; }
+    // 通常回避判定
+    let eva = s.AGI*0.025; if(g.currentJob.bonus.eva) eva+=g.currentJob.bonus.eva;
+    if(act==='atk' && !g.guardStance && !g.parryActive && Math.random()<eva) { 
+        // Sonic Counter
+        const counter = Math.floor(s.AGI * 0.5);
+        log(`回避反撃(Sonic)! ${counter}dmg`,"l-spd");
+        applyDamageToEnemy(counter, "Counter");
+        if(g.enemy.hp<=0) winBattle();
+        
+        tickBattleTurns(); return; 
+    }
 
     let dmg = 0;
     if(act === 'mag') { dmg = Math.max(5, g.enemy.atk - Math.floor(s.MND/2)); log(`呪い！`,"l-dmg"); } 
     else { dmg = Math.max(1, g.enemy.atk - Math.floor(s.VIT/3)); }
     
     if(g.currentJob.bonus.def && act==='atk') dmg = Math.floor(dmg * g.currentJob.bonus.def);
-    
-    if(g.guardStance === 2 && act==='atk') { dmg = 0; log("完全防御！", "l-grn"); }
-    else if(g.guardStance === 1 && act==='atk') { dmg = Math.floor(dmg/2); log("防御！", "l-grn"); }
+    if(guard && act==='atk') {
+         dmg = Math.floor(dmg/2);
+         log("防御！", "l-grn");
+    }
 
     if(g.parryActive && act==='atk') {
         g.parryActive = false;
@@ -669,3 +696,4 @@ window.onload = () => {
     if(localStorage.getItem(SAVE_KEY)) loadGame();
     else updateUI();
 };
+
