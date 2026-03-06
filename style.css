@@ -53,11 +53,11 @@ button { cursor: pointer; user-select: none; touch-action: manipulation; font-fa
 #status-panel { background: #222; padding: 8px; border-radius: 4px; margin-bottom: 10px; font-weight: bold; font-size: 0.9em; color: #eee; border: 1px solid #444; }
 .st-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
 
-#item-belt { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 4px; }
+#item-belt { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 4px; min-height: 38px; align-items: center; }
 .item-chip { border: 1px solid #666; background: #333; color: #eee; padding: 5px 10px; font-size: 0.8em; cursor: pointer; white-space: nowrap; border-radius: 3px; }
 .item-chip:hover { border-color: #fff; background: #444; }
 
-#cmd-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-bottom: 12px; }
+#cmd-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-bottom: 12px; min-height: 120px; align-content: start; }
 .cmd-btn { background: #222; color: #eee; border: 1px solid #555; padding: 5px; cursor: pointer; text-align: center; min-height: 55px; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 4px; }
 .cmd-btn:active { background: #444; }
 .cmd-btn:disabled { opacity: 0.3; filter: grayscale(100%); }
