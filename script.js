@@ -38,8 +38,16 @@ const ENEMY_TYPES = [
     { id: 'golem', name: 'Golem', hpMod: 1.4, defMod: 1.1, mDefMod: 0.8, eva: -0.1, act:['atk','atk','charge'], desc: 'タメ攻撃注意' },
     { id: 'ghost', name: 'Ghost', hpMod: 0.6, defMod: 2.5, mDefMod: 0.4, eva: 0.1, act:['mag'], desc: '物理耐性/呪い' }
 ];
-const BOSSES = {
-    5: { id:'cerberus', name:'Cerberus', hp:200, atk:15, defMod:1.0, mDefMod:1.0, eva:0.05, act:['atk','atk','charge','mag'], desc:'【中ボス】地獄の番犬' },
+const ENEMY_VISUALS = {
+    slime: { icon: '◉', aura: 'aura-slime' },
+    bat: { icon: '🜁', aura: 'aura-bat' },
+    golem: { icon: '⬣', aura: 'aura-golem' },
+    ghost: { icon: '☽', aura: 'aura-ghost' },
+    cerberus: { icon: '♆', aura: 'aura-cerberus' },
+    overlord: { icon: '✦', aura: 'aura-overlord' },
+    default: { icon: '◇', aura: 'aura-default' }
+};
+const BOSSES = {    5: { id:'cerberus', name:'Cerberus', hp:200, atk:15, defMod:1.0, mDefMod:1.0, eva:0.05, act:['atk','atk','charge','mag'], desc:'【中ボス】地獄の番犬' },
     10: { id:'overlord', name:'Overlord', hp:500, atk:25, defMod:1.2, mDefMod:1.2, eva:0.1, act:['atk','mag','charge','heal'], desc:'【BOSS】螺旋の終焉' }
 };
 const ITEM_DATA = {
