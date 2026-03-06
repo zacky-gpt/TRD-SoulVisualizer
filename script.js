@@ -586,14 +586,15 @@ function updateUI() {
 function updateEncounter() {
     const b = document.getElementById('encounter-box'); const c = document.getElementById('enc-content');
     if(g.state==='BATTLE' && g.enemy) {
+        const vis = ENEMY_VISUALS[g.enemy.id] || ENEMY_VISUALS.default;
         b.style.display='block'; 
         if(g.enemy.isBoss) b.style.borderColor='#f80';
         else b.style.borderColor = g.enemy.id==='slime'?'#484':(g.enemy.id==='ghost'?'#468':'#666');
-        c.innerHTML = `<span class="en-name" style="color:#fff">${g.enemy.name} (Lv${g.enemy.lv})</span><span class="en-desc">${g.enemy.desc}</span><br><div style="margin-top:2px; color:#fa0;">HP: ${g.enemy.hp} / ${g.enemy.mhp}</div>`;
+        c.innerHTML = `<div class="enc-wrap ${vis.aura}"><div class="enemy-glyph">${vis.icon}</div><div class="enemy-meta"><span class="en-name" style="color:#fff">${g.enemy.name} (Lv${g.enemy.lv})</span><span class="en-desc">${g.enemy.desc}</span><div class="enemy-hp">HP: ${g.enemy.hp} / ${g.enemy.mhp}</div></div></div>`;
     } else if(g.state==='CHEST' && g.chest) {
         b.style.display='block'; b.style.borderColor='#ba0';
         let i = g.chest.identified ? (g.chest.trap?"<span style='color:#f66'>罠あり</span>":"<span style='color:#6f6'>安全</span>") : "未鑑定";
-        c.innerHTML = `<span class="en-name" style="color:#fd0">Treasure Chest</span><span class="en-desc">状態: ${i}</span>`;
+        c.innerHTML = `<div class="enc-wrap aura-chest"><div class="enemy-glyph">⌘</div><div class="enemy-meta"><span class="en-name" style="color:#fd0">Treasure Chest</span><span class="en-desc">状態: ${i}</span></div></div>`;
     } else { b.style.display='none'; }
 }
 
