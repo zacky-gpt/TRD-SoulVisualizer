@@ -23,7 +23,9 @@ button { cursor: pointer; user-select: none; touch-action: manipulation; font-fa
 .th-d { background: linear-gradient(90deg, #4f4, #a84); } 
 .th-r { background: linear-gradient(90deg, #4af, #ff4); } 
 
-#encounter-box { min-height: 70px; margin-bottom: 12px; padding: 8px; border: 1px solid #555; text-align: center; background: #000; display: none; border-radius: 4px; }
+#encounter-box { min-height: 98px; margin-bottom: 12px; padding: 8px; border: 1px solid #555; text-align: center; background: #000; display: block; border-radius: 4px; }
+#encounter-box.is-hidden { visibility: hidden; }
+#enc-content { min-height: 80px; display: flex; align-items: center; justify-content: center; }
 .en-name { font-size: 1.15em; font-weight: bold; display: block; margin-bottom: 3px; }
 .en-desc { font-size: 0.8em; color: #aaa; }
 .enc-wrap { display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid #333; border-radius: 6px; padding: 8px; background: radial-gradient(circle at 50% 20%, #151515, #050505 70%); }
