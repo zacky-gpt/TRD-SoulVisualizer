@@ -83,9 +83,17 @@ function loadGame() {
         const d = localStorage.getItem(SAVE_KEY);
         if(!d) { log("記録がありません", "l-gry"); return; }
         const loaded = JSON.parse(d);
-        g = { ...INITIAL_G, ...loaded };
+        g = {
+            ...INITIAL_G,
+            ...loaded,
+            axis: { ...INITIAL_G.axis, ...(loaded.axis || {}) },
+            items: { ...INITIAL_G.items, ...(loaded.items || {}) }
+        };
+        const loadedJobId = loaded.currentJob?.id;
+        g.currentJob = JOBS.find(j => j.id === loadedJobId) || JOBS[0];
         updateJob(); log("記録を読込", "l-sys"); updateUI();
     } catch(e) { log("読込失敗", "l-red"); }
+}
 }
 function resetGame() {
     if(!confirm("リセットしますか？")) return;
