@@ -33,11 +33,12 @@ const JOBS = [
 ];
 
 const ENEMY_TYPES = [
-    { id: 'slime', name: 'Slime', hpMod: 0.8, defMod: 1.5, mDefMod: 0.2, eva: 0, act:['atk','atk','heal'], desc: '再生能力' },
-    { id: 'bat', name: 'Bat', hpMod: 0.6, defMod: 0.5, mDefMod: 0.5, eva: 0.25, act:['atk'], desc: '高回避' },
-    { id: 'golem', name: 'Golem', hpMod: 1.4, defMod: 1.1, mDefMod: 0.8, eva: -0.1, act:['atk','atk','charge'], desc: 'タメ攻撃注意' },
-    { id: 'ghost', name: 'Ghost', hpMod: 0.6, defMod: 2.5, mDefMod: 0.4, eva: 0.1, act:['mag'], desc: '物理耐性/呪い' }
+    { id: 'slime', name: 'Slime', hpMod: 0.8, defMod: 1.5, mDefMod: 0.2, eva: 0, act:['atk','atk','heal'], affinity:'MND', attackStat:'MND', desc: '再生能力' },
+    { id: 'bat', name: 'Bat', hpMod: 0.6, defMod: 0.5, mDefMod: 0.5, eva: 0.25, act:['atk'], affinity:'AGI', attackStat:'AGI', desc: '高回避' },
+    { id: 'golem', name: 'Golem', hpMod: 1.4, defMod: 1.1, mDefMod: 0.8, eva: -0.1, act:['atk','atk','charge'], affinity:'VIT', attackStat:'STR', desc: 'タメ攻撃注意' },
+    { id: 'ghost', name: 'Ghost', hpMod: 0.6, defMod: 2.5, mDefMod: 0.4, eva: 0.1, act:['mag'], affinity:'INT', attackStat:'INT', desc: '物理耐性/呪い' }
 ];
+const HEX_ADV = { STR:'VIT', VIT:'DEX', DEX:'INT', INT:'AGI', AGI:'MND', MND:'STR' };
 const ENEMY_VISUALS = {
     slime: { icon: '◉', aura: 'aura-slime' },
     bat: { icon: '🜁', aura: 'aura-bat' },
@@ -157,9 +158,35 @@ function calcHit(acc, type, s, cap) {
     let r = acc; if(type==='phys'||type==='hyb') r += (s.DEX * 0.01);
     if(g.enemy) r -= g.enemy.eva;
     let res = Math.min(1.0, Math.max(0.0, r));
-    if(cap !== undefined) res = Math.min(res, cap);
+       if(cap !== undefined) res = Math.min(res, cap);
     return res;
 }
+
+function calcFloorEnemyLv(floor) {
+    const growth = 1.35 + Math.min(1.1, Math.max(0, floor - 1) * 0.08);
+    return Math.max(1, Math.floor(floor * growth + Math.random() * 2));
+}
+
+function getAttackStatByType(type, s) {
+    if(type === 'phys') return 'STR';
+    if(type === 'mag') return 'INT';
+    if(type === 'hyb') return (s.STR >= s.INT) ? 'STR' : 'INT';
+    return 'STR';
+}
+
+function getHexMultiplier(attackerStat, defenderAffinity) {
+    if(!attackerStat || !defenderAffinity) return 1.0;
+    if(HEX_ADV[attackerStat] === defenderAffinity) return 1.3;
+    if(HEX_ADV[defenderAffinity] === attackerStat) return 0.75;
+    return 1.0;
+}
+
+function getPlayerDominantStat(s) {
+    const pairs = Object.entries(s).filter(([k]) => ['STR','INT','VIT','AGI','DEX','MND'].includes(k));
+    pairs.sort((a, b) => b[1] - a[1]);
+    return pairs[0]?.[0] || 'STR';
+}
+
 function calcDmg(sk, s) {
     const type = sk.type;
     const pwr = sk.pwr;
@@ -174,7 +201,10 @@ function calcDmg(sk, s) {
     
     if(g.currentJob.id === 'paladin' && g.enemy.id === 'ghost' && sk.name === 'HolyBlade') mod *= 2.0;
 
-    let val = Math.floor(base * pwr * mod); if(val < 1) val = 1;
+        const atkStat = getAttackStatByType(type, s);
+    const hexMod = g.enemy ? getHexMultiplier(atkStat, g.enemy.affinity) : 1.0;
+
+    let val = Math.floor(base * pwr * mod * hexMod); if(val < 1) val = 1;
     if(!g.enemy) return {min:0, max:0};
     
     let def = 0;
@@ -231,10 +261,10 @@ function actExplore() {
 
 function startBattle(fE=null) {
     let e; if(fE) e=fE;
-    else { 
-        const lv=Math.floor(g.floor*1.8) + Math.floor(Math.random()*2); 
-        const t=ENEMY_TYPES[Math.floor(Math.random()*ENEMY_TYPES.length)]; 
-        e={...t, lv:lv, type:t.id, mhp:Math.floor((20+lv*8)*t.hpMod), hp:Math.floor((20+lv*8)*t.hpMod), atk:5+lv*2}; 
+    else {
+        const lv = calcFloorEnemyLv(g.floor);
+        const t=ENEMY_TYPES[Math.floor(Math.random()*ENEMY_TYPES.length)];
+        e={...t, lv:lv, type:t.id, mhp:Math.floor((20+lv*8)*t.hpMod), hp:Math.floor((20+lv*8)*t.hpMod), atk:5+lv*2};
     }
     g.enemy=e; g.isCharging=false; g.isStunned=false; g.parryActive=false; g.isFocused=false; g.guardStance=0;
     g.state = 'BATTLE';
@@ -291,12 +321,15 @@ function actBattle(sk) {
         log(`${sk.name}! (防御)`,"l-grn"); enemyTurn(); updateUI(); return; 
     }
 
-    if(sk.id==='Mug') {
+        if(sk.id==='Mug') {
         const hit = calcHit(sk.acc, sk.type, s);
         if(Math.random() > hit) log("ミス！","l-gry");
         else {
             const d = calcDmg(sk, s);
             let dmg = Math.floor(d.min + Math.random()*(d.max-d.min));
+            const hexMod = getHexMultiplier(getAttackStatByType(sk.type, s), g.enemy.affinity);
+            if(hexMod > 1.0) log("相性有利！", "l-grn");
+            else if(hexMod < 1.0) log("相性不利...", "l-red");
             applyDamageToEnemy(dmg, sk.name);
             const items = Object.keys(ITEM_DATA).filter(k => k !== 'clock');
             const it = items[Math.floor(Math.random()*items.length)];
@@ -314,11 +347,14 @@ function actBattle(sk) {
     } else {
         // Normal Attack / Skill
         const hit = calcHit(sk.acc, sk.type, s, sk.cap);
-        if(Math.random() > hit) log("ミス！","l-gry");
+               if(Math.random() > hit) log("ミス！","l-gry");
         else {
             const range = calcDmg(sk, s);
             let dmg = Math.floor(range.min + Math.random()*(range.max-range.min+1));
-            let cr=0.05; 
+            const hexMod = getHexMultiplier(getAttackStatByType(sk.type, s), g.enemy.affinity);
+            if(hexMod > 1.0) log("相性有利！", "l-grn");
+            else if(hexMod < 1.0) log("相性不利...", "l-red");
+            let cr=0.05;
             if(sk.id==='snipe' || g.isFocused) cr=1.0; 
             else if(g.currentJob.bonus.crit) cr+=g.currentJob.bonus.crit;
             
@@ -418,9 +454,15 @@ function enemyTurn(guard=false) {
         tickBattleTurns(); return; 
     }
 
-    let dmg = 0;
-    if(act === 'mag') { dmg = Math.max(5, g.enemy.atk - Math.floor(s.MND/2)); log(`呪い！`,"l-dmg"); } 
+        let dmg = 0;
+    if(act === 'mag') { dmg = Math.max(5, g.enemy.atk - Math.floor(s.MND/2)); log(`呪い！`,"l-dmg"); }
     else { dmg = Math.max(1, g.enemy.atk - Math.floor(s.VIT/3)); }
+
+    const enemyAtkStat = g.enemy.attackStat || (act === 'mag' ? 'INT' : 'STR');
+    const playerDominant = getPlayerDominantStat(s);
+    const enemyHexMod = getHexMultiplier(enemyAtkStat, playerDominant);
+    dmg = Math.floor(dmg * enemyHexMod);
+    if(enemyHexMod > 1.0) log("弱点を突かれた！", "l-red");
     
     if(g.currentJob.bonus.def && act==='atk') dmg = Math.floor(dmg * g.currentJob.bonus.def);
     if(guard && act==='atk') {
@@ -587,12 +629,21 @@ function updateEncounter() {
     const b = document.getElementById('encounter-box'); const c = document.getElementById('enc-content');
     if(g.state==='BATTLE' && g.enemy) {
         const vis = ENEMY_VISUALS[g.enemy.id] || ENEMY_VISUALS.default;
-        b.style.display='block'; 
+        b.classList.remove('is-hidden');
         if(g.enemy.isBoss) b.style.borderColor='#f80';
         else b.style.borderColor = g.enemy.id==='slime'?'#484':(g.enemy.id==='ghost'?'#468':'#666');
         c.innerHTML = `<div class="enc-wrap ${vis.aura}"><div class="enemy-glyph">${vis.icon}</div><div class="enemy-meta"><span class="en-name" style="color:#fff">${g.enemy.name} (Lv${g.enemy.lv})</span><span class="en-desc">${g.enemy.desc}</span><div class="enemy-hp">HP: ${g.enemy.hp} / ${g.enemy.mhp}</div></div></div>`;
     } else if(g.state==='CHEST' && g.chest) {
-        b.style.display='block'; b.style.borderColor='#ba0';
+        b.classList.remove('is-hidden');
+        b.style.borderColor='#ba0';
+        let i = g.chest.identified ? (g.chest.trap?"<span style='color:#f66'>罠あり</span>":"<span style='color:#6f6'>安全</span>") : "未鑑定";
+        c.innerHTML = `<div class="enc-wrap aura-chest"><div class="enemy-glyph">⌘</div><div class="enemy-meta"><span class="en-name" style="color:#fd0">Treasure Chest</span><span class="en-desc">状態: ${i}</span></div></div>`;
+    } else {
+        b.classList.add('is-hidden');
+        b.style.borderColor='#555';
+        c.innerHTML = `<div class="en-desc">探索中...</div>`;
+    }
+}        b.style.display='block'; b.style.borderColor='#ba0';
         let i = g.chest.identified ? (g.chest.trap?"<span style='color:#f66'>罠あり</span>":"<span style='color:#6f6'>安全</span>") : "未鑑定";
         c.innerHTML = `<div class="enc-wrap aura-chest"><div class="enemy-glyph">⌘</div><div class="enemy-meta"><span class="en-name" style="color:#fd0">Treasure Chest</span><span class="en-desc">状態: ${i}</span></div></div>`;
     } else { b.style.display='none'; }
