@@ -1,4 +1,4 @@
-// エラーハンドリング
+﻿// エラーハンドリング
 window.onerror = function(msg, url, line) {
     const el = document.getElementById('error-trap');
     if(el) { el.style.display = 'block'; el.innerText = `ERROR: ${msg} (Line ${line})`; }
@@ -38,7 +38,7 @@ const ENEMY_TYPES = [
     { id: 'golem', name: 'Golem', hpMod: 1.4, defMod: 1.1, mDefMod: 0.8, eva: -0.1, act:['atk','atk','charge'], affinity:'VIT', attackStat:'STR', desc: 'タメ攻撃注意' },
     { id: 'ghost', name: 'Ghost', hpMod: 0.6, defMod: 2.5, mDefMod: 0.4, eva: 0.1, act:['mag'], affinity:'INT', attackStat:'INT', desc: '物理耐性/呪い' }
 ];
-const HEX_ADV = { STR:'VIT', VIT:'DEX', DEX:'INT', INT:'AGI', AGI:'MND', MND:'STR' };
+const HEX_ADV = { STR:'INT', INT:'AGI', AGI:'VIT', VIT:'DEX', DEX:'MND', MND:'STR' };
 const ENEMY_VISUALS = {
     slime: { icon: '◉', aura: 'aura-slime' },
     bat: { icon: '🜁', aura: 'aura-bat' },
@@ -54,7 +54,7 @@ const BOSSES = {    5: { id:'cerberus', name:'Cerberus', hp:200, atk:15, defMod:
 const ITEM_DATA = {
     potion: { name: "Potion", desc: "HP50回復", type: "heal", val: 50 },
     ether:  { name: "Ether", desc: "MP20回復", type: "mp", val: 20 },
-    bomb:   { name: "Bomb", desc: "防御無視30dmg", type: "dmg", val: 30 },
+    bomb:   { name: "Bomb", desc: "防御無視50dmg", type: "dmg", val: 50 },
     clock:  { name: "Clock", desc: "寿命+10", type: "turn", val: 10 }
 };
 
@@ -94,14 +94,13 @@ function loadGame() {
         updateJob(); log("記録を読込", "l-sys"); updateUI();
     } catch(e) { log("読込失敗", "l-red"); }
 }
-}
 function resetGame() {
     if(!confirm("リセットしますか？")) return;
     localStorage.removeItem(SAVE_KEY); location.reload();
 }
 
 function getStats() {
-    let b = 5 + (g.lv * 1.0); 
+    let b = 5 + (g.lv * 4.0);
     if(g.awakening) b *= 1.5;
     const a = g.axis;
     return {
@@ -109,6 +108,48 @@ function getStats() {
         VIT: Math.floor(b * (a.D/50)), AGI: Math.floor(b * ((100-a.D)/50)),
         DEX: Math.floor(b * (a.R/50)), MND: Math.floor(b * ((100-a.R)/50))
     };
+}
+function clamp(v, min, max) {
+    return Math.max(min, Math.min(max, v));
+}
+function getEnemySoulStats(enemy) {
+    const base = 5 + (enemy.lv * 4.0);
+    const stats = { STR: base, INT: base, VIT: base, AGI: base, DEX: base, MND: base };
+    if(stats[enemy.affinity] !== undefined) stats[enemy.affinity] = Math.floor(stats[enemy.affinity] * 1.35);
+    if(stats[enemy.attackStat] !== undefined) stats[enemy.attackStat] = Math.floor(stats[enemy.attackStat] * 1.2);
+    stats.VIT = Math.max(1, Math.floor(stats.VIT * (enemy.hpMod || 1)));
+    stats.MND = Math.max(1, Math.floor(stats.MND * (enemy.defMod || 1)));
+    stats.STR = Math.max(1, Math.floor(stats.STR * (enemy.mDefMod || 1)));
+    const evasiveScale = 1 + (enemy.eva || 0);
+    stats.AGI = Math.max(1, Math.floor(stats.AGI * evasiveScale));
+    stats.DEX = Math.max(1, Math.floor(stats.DEX * Math.max(0.8, evasiveScale)));
+    return stats;
+}
+function getDefenseRate(stat, defenseCut=0) {
+    return clamp((stat / 200) * (1 - defenseCut), 0, 0.8);
+}
+function getVitCut(vit) {
+    return clamp(vit * 0.002, 0, 0.4);
+}
+function getCritChance(attackerDex, defenderDex, bonus=0) {
+    return clamp(0.05 + bonus + ((attackerDex - defenderDex) * 0.02), 0.05, 1.0);
+}
+function getDefenseCutRate(attackerDex, defenderDex) {
+    return clamp(0.50 + ((attackerDex - defenderDex) * 0.01), 0.50, 1.0);
+}
+function applyCrossDefense(raw, defenseStat, vitStat, defenseCut=0) {
+    const afterDefense = raw * (1 - getDefenseRate(defenseStat, defenseCut));
+    return Math.max(1, Math.floor(afterDefense * (1 - getVitCut(vitStat))));
+}
+function getPhysicalHitChance(acc, attackerAgi, defenderAgi, cap) {
+    let chance = clamp(acc + ((attackerAgi - defenderAgi) * 0.025), 0.05, 1.0);
+    if(cap !== undefined) chance = Math.min(chance, cap);
+    return chance;
+}
+function rollRange(value, variance=0.1) {
+    const min = Math.max(1, Math.floor(value * (1 - variance)));
+    const max = Math.max(min, Math.floor(value * (1 + variance)));
+    return { min, max };
 }
 function updateJob() {
     const t=g.axis.T, d=g.axis.D, r=g.axis.R; let best=JOBS[0], bestP=0;
@@ -163,13 +204,19 @@ function getDeck() {
 
 function calcHit(acc, type, s, cap) {
     if(g.isFocused) return 1.0;
-    let r = acc; if(type==='phys'||type==='hyb') r += (s.DEX * 0.01);
-    if(g.enemy) r -= g.enemy.eva;
-    let res = Math.min(1.0, Math.max(0.0, r));
-       if(cap !== undefined) res = Math.min(res, cap);
-    return res;
+    if(type === 'mag') return 1.0;
+    if(!g.enemy) return clamp(acc, 0.05, 1.0);
+    const enemyStats = getEnemySoulStats(g.enemy);
+    return getPhysicalHitChance(acc, s.AGI, enemyStats.AGI, cap);
 }
 
+function getSkillAttackStat(sk, s) {
+    if(sk.id === 'atk') return g.axis.T >= 50 ? 'STR' : 'INT';
+    if(sk.type === 'phys') return 'STR';
+    if(sk.type === 'mag') return 'INT';
+    if(sk.type === 'hyb') return (s.STR >= s.INT) ? 'STR' : 'INT';
+    return 'STR';
+}
 function calcFloorEnemyLv(floor) {
     const growth = 1.35 + Math.min(1.1, Math.max(0, floor - 1) * 0.08);
     return Math.max(1, Math.floor(floor * growth + Math.random() * 2));
@@ -195,32 +242,77 @@ function getPlayerDominantStat(s) {
     return pairs[0]?.[0] || 'STR';
 }
 
-function calcDmg(sk, s) {
-    const type = sk.type;
-    const pwr = sk.pwr;
-
-    if(type==='heal'||type==='def'||type==='buff') return {min:0,max:0};
-    let base = 0;
-    if(type==='phys') base=s.STR; else if(type==='mag') base=s.INT; else if(type==='hyb') base=(s.STR+s.INT)*0.6;
-    else if(type==='bomb') return {min:30, max:30};
-
-    const jb = g.currentJob.bonus; let mod = 1.0;
-    if(type==='phys' && jb.phys) mod *= jb.phys; if(type==='mag' && jb.mag) mod *= jb.mag;
-    
-    if(g.currentJob.id === 'paladin' && g.enemy.id === 'ghost' && sk.name === 'HolyBlade') mod *= 2.0;
-
-        const atkStat = getAttackStatByType(type, s);
-    const hexMod = g.enemy ? getHexMultiplier(atkStat, g.enemy.affinity) : 1.0;
-
-    let val = Math.floor(base * pwr * mod * hexMod); if(val < 1) val = 1;
-    if(!g.enemy) return {min:0, max:0};
-    
-    let def = 0;
-    if(type==='phys'||type==='hyb') def=(g.enemy.lv*1.5)*(g.enemy.defMod||1); else if(type==='mag') def=(g.enemy.lv*1.0)*(g.enemy.mDefMod||1);
-    const net = Math.max(1, val - Math.floor(def/2));
-    return {min:Math.floor(net*0.9), max:Math.floor(net*1.1)};
+function getJobDamageMod(sk) {
+    const jb = g.currentJob.bonus || {};
+    let mod = 1.0;
+    if(sk.type === 'phys' && jb.phys) mod *= jb.phys;
+    if(sk.type === 'mag' && jb.mag) mod *= jb.mag;
+    if(sk.type === 'hyb') mod *= Math.max(jb.phys || 1, jb.mag || 1);
+    if(g.currentJob.id === 'paladin' && g.enemy && g.enemy.id === 'ghost' && sk.name === 'HolyBlade') mod *= 2.0;
+    return mod;
 }
+function calcSpectrumDamage(totalRaw, enemyStats, defenseCut=0) {
+    const physRatio = g.axis.T / 100;
+    const magRatio = (100 - g.axis.T) / 100;
+    const phys = applyCrossDefense(totalRaw * physRatio, enemyStats.MND, enemyStats.VIT, defenseCut);
+    const mag = applyCrossDefense(totalRaw * magRatio, enemyStats.STR, enemyStats.VIT, 0);
+    return phys + mag;
+}
+function resolvePlayerAttack(sk, s, preview=false) {
+    if(!g.enemy) return { damage: 0, range: { min: 0, max: 0 }, hexMod: 1.0, crit: false };
+    if(sk.type==='heal'||sk.type==='def'||sk.type==='buff') return { damage: 0, range: { min: 0, max: 0 }, hexMod: 1.0, crit: false };
+    if(sk.type === 'bomb') return { damage: 50, range: { min: 50, max: 50 }, hexMod: 1.0, crit: false };
 
+    const enemyStats = getEnemySoulStats(g.enemy);
+    const power = sk.pwr || 1.0;
+    const jobMod = getJobDamageMod(sk);
+    const hexMod = getHexMultiplier(getSkillAttackStat(sk, s), g.enemy.affinity);
+    const critEligible = (sk.id === 'atk' || sk.type === 'phys' || sk.type === 'hyb' || sk.id === 'snipe');
+    let crit = false;
+    let defenseCut = 0;
+
+    if(!preview && critEligible) {
+        let critChance = getCritChance(s.DEX, enemyStats.DEX, g.currentJob.bonus.crit || 0);
+        if(sk.id === 'snipe' || g.isFocused) critChance = 1.0;
+        crit = Math.random() < critChance;
+        if(crit) defenseCut = getDefenseCutRate(s.DEX, enemyStats.DEX);
+    }
+
+    let total = 1;
+    if(sk.id === 'atk') {
+        const raw = Math.max(1, Math.floor(((s.STR + s.INT) * 0.5) * power * jobMod * hexMod));
+        total = calcSpectrumDamage(raw, enemyStats, defenseCut);
+    } else if(sk.type === 'phys') {
+        const raw = Math.max(1, Math.floor(s.STR * power * jobMod * hexMod));
+        total = applyCrossDefense(raw, enemyStats.MND, enemyStats.VIT, defenseCut);
+    } else if(sk.type === 'mag') {
+        const raw = Math.max(1, Math.floor(s.INT * power * jobMod * hexMod));
+        total = applyCrossDefense(raw, enemyStats.STR, enemyStats.VIT, 0);
+    } else if(sk.type === 'hyb') {
+        const raw = Math.max(1, Math.floor(((s.STR + s.INT) * 0.6) * power * jobMod * hexMod));
+        total = applyCrossDefense(raw * 0.5, enemyStats.MND, enemyStats.VIT, defenseCut) + applyCrossDefense(raw * 0.5, enemyStats.STR, enemyStats.VIT, 0);
+    }
+
+    const range = rollRange(total, 0.1);
+    const damage = preview ? Math.floor((range.min + range.max) / 2) : (range.min + Math.floor(Math.random() * (range.max - range.min + 1)));
+    return { damage, range, hexMod, crit, defenseCut };
+}
+function buildEnemyAttack(act, s, charged=false) {
+    const enemyStats = getEnemySoulStats(g.enemy);
+    const attackStat = g.enemy.attackStat || (act === 'mag' ? 'INT' : 'STR');
+    const playerAffinity = getPlayerDominantStat(s);
+    const hexMod = getHexMultiplier(attackStat, playerAffinity);
+    let raw = Math.max(g.enemy.atk, Math.floor((enemyStats[attackStat] || g.enemy.atk) * 0.9));
+    if(charged) raw = Math.floor(raw * 2.5);
+    raw = Math.max(1, Math.floor(raw * hexMod));
+    const damage = (act === 'mag')
+        ? applyCrossDefense(raw, s.STR, s.VIT, 0)
+        : applyCrossDefense(raw, s.MND, s.VIT, 0);
+    return { damage, hexMod, enemyStats, attackStat };
+}
+function calcDmg(sk, s) {
+    return resolvePlayerAttack(sk, s, true).range;
+}
 // Actions
 function log(msg, cls="") { const d=document.createElement('div'); d.className=cls; d.innerText=msg; document.getElementById('log-list').prepend(d); }
 function consumeTime(v) {
@@ -289,150 +381,149 @@ function startChest() {
 function actBattle(sk) {
     if(g.gameOver || !g.enemy || g.enemy.hp<=0 || g.state!=='BATTLE') return;
     if(sk.cd && g.jobSkillCd > 0) { log(`充填中... (あと${g.jobSkillCd}T)`,"l-gry"); return; }
-    
-    g.mp -= (sk.mp||0); 
-    if(sk.cd) g.jobSkillCd = sk.cd; 
-    
-    tickBattleTurns(); 
+
+    g.mp -= (sk.mp||0);
+    if(sk.cd) g.jobSkillCd = sk.cd;
+    tickBattleTurns();
 
     const s = getStats();
-    
-    // --- Player Action ---
+
     if(sk.type==='heal') {
-        const v = Math.floor((20*g.currentJob.bonus.heal||20)+s.MND*2); g.hp=Math.min(g.mhp, g.hp+v); log(`HP${v}回復`,"l-grn"); 
-        // 回復後は確定で敵のターンへ
-        enemyTurn(); updateUI(); return;
+        const healBonus = g.currentJob.bonus.heal || 1;
+        const v = Math.floor((20 * healBonus) + s.MND * 2);
+        g.hp = Math.min(g.mhp, g.hp + v);
+        log(`HP${v}回復`,"l-grn");
+        enemyTurn();
+        updateUI();
+        return;
     }
     if(sk.id==='trip') {
-        if(Math.random() < 0.8) { 
-            g.enemy.isStunned=true; 
-            if(g.isCharging){ g.isCharging=false; log("足払い！ため解除！","l-grn"); }
-            else log("足払い成功！","l-grn"); 
-        } else log("足払い失敗","l-gry");
-        enemyTurn(); updateUI(); return;
+        if(Math.random() < 0.8) {
+            g.enemy.isStunned = true;
+            if(g.isCharging) {
+                g.isCharging = false;
+                log("足払い！ため解除！", "l-grn");
+            } else {
+                log("足払い成功！", "l-grn");
+            }
+        } else log("足払い失敗", "l-gry");
+        enemyTurn();
+        updateUI();
+        return;
     }
-    if(sk.id==='parry') { g.parryActive = true; log("構えた！(Parry)","l-grn"); enemyTurn(); updateUI(); return; }
-    if(sk.id==='focus') { g.isFocused = true; log("集中！(次回必中Crit)","l-grn"); enemyTurn(); updateUI(); return; }
-    
-    if(sk.id==='Guts' || sk.id==='Guts+') { 
-        g.immortalTurns = sk.id==='Guts'?3:4; 
-        if(sk.id==='Guts+') g.awakening=true; 
-        log("ド根性！食いしばり付与","l-grn"); enemyTurn(); updateUI(); return; 
+    if(sk.id==='parry') { g.parryActive = true; log("構えた！(Parry)", "l-grn"); enemyTurn(); updateUI(); return; }
+    if(sk.id==='focus') { g.isFocused = true; log("集中！", "l-grn"); enemyTurn(); updateUI(); return; }
+
+    if(sk.id==='Guts' || sk.id==='Guts+') {
+        g.immortalTurns = sk.id==='Guts' ? 3 : 4;
+        if(sk.id==='Guts+') g.awakening = true;
+        log("ド根性！食いしばり付与", "l-grn");
+        enemyTurn();
+        updateUI();
+        return;
     }
-    if(sk.id==='Awakening') { 
-        g.immortalTurns = 5; g.awakening=true; 
-        log("覚醒！能力UP＆不死！","l-spd"); enemyTurn(); updateUI(); return; 
+    if(sk.id==='Awakening') {
+        g.immortalTurns = 5;
+        g.awakening = true;
+        log("覚醒！能力UP＆不死！", "l-spd");
+        enemyTurn();
+        updateUI();
+        return;
     }
-    
-    if(sk.id==='IronWall' || sk.id==='Aegis' || sk.name==='Guard') { 
-        g.guardStance = (sk.id==='IronWall' || sk.id==='Aegis') ? 2 : 1; 
-        log(`${sk.name}! (防御)`,"l-grn"); enemyTurn(); updateUI(); return; 
+    if(sk.id==='IronWall' || sk.id==='Aegis' || sk.name==='Guard') {
+        g.guardStance = (sk.id==='IronWall' || sk.id==='Aegis') ? 2 : 1;
+        log(`${sk.name}! (防御)`,"l-grn");
+        enemyTurn();
+        updateUI();
+        return;
     }
 
-        if(sk.id==='Mug') {
-        const hit = calcHit(sk.acc, sk.type, s);
-        if(Math.random() > hit) log("ミス！","l-gry");
-        else {
-            const d = calcDmg(sk, s);
-            let dmg = Math.floor(d.min + Math.random()*(d.max-d.min));
-            const hexMod = getHexMultiplier(getAttackStatByType(sk.type, s), g.enemy.affinity);
-            if(hexMod > 1.0) log("相性有利！", "l-grn");
-            else if(hexMod < 1.0) log("相性不利...", "l-red");
-            applyDamageToEnemy(dmg, sk.name);
-            const items = Object.keys(ITEM_DATA).filter(k => k !== 'clock');
-            const it = items[Math.floor(Math.random()*items.length)];
-            if(g.items[it] < CONF.itemMax) { g.items[it]++; log(`盗んだ！${ITEM_DATA[it].name}`,"l-yel"); }
-            else log(`盗んだが持てない`,"l-gry");
-        }
-    } else if(sk.isInstantDeath) {
-        let rate = 0.5; 
+    if(sk.isInstantDeath) {
+        let rate = 0.5;
         if(g.enemy.isBoss) rate = (g.floor===5) ? 0.10 : 0.03;
         if(Math.random() < rate) {
-            log(`即死発動！！ ${g.enemy.name}を葬った！`,"l-kill"); g.enemy.hp=0; winBattle(); updateUI(); return;
-        } else {
-            log("即死失敗... (1dmg)","l-gry"); applyDamageToEnemy(1, "即死ミス");
-        }
-    } else {
-        // Normal Attack / Skill
-        const hit = calcHit(sk.acc, sk.type, s, sk.cap);
-               if(Math.random() > hit) log("ミス！","l-gry");
-        else {
-            const range = calcDmg(sk, s);
-            let dmg = Math.floor(range.min + Math.random()*(range.max-range.min+1));
-            const hexMod = getHexMultiplier(getAttackStatByType(sk.type, s), g.enemy.affinity);
-            if(hexMod > 1.0) log("相性有利！", "l-grn");
-            else if(hexMod < 1.0) log("相性不利...", "l-red");
-            let cr=0.05;
-            if(sk.id==='snipe' || g.isFocused) cr=1.0; 
-            else if(g.currentJob.bonus.crit) cr+=g.currentJob.bonus.crit;
-            
-            // DEX Scaling Crit
-            let critMult = 1.5 + (s.DEX * 0.01);
-            if(Math.random()<cr) { dmg=Math.floor(dmg*critMult); log(`Critical(x${critMult.toFixed(1)})!!`,"l-red"); }
-            applyDamageToEnemy(dmg, sk.name, sk.type);
-            
-            if(g.isFocused) g.isFocused = false; 
-        }
-    }
-
-    // 敵死亡判定
-    if(g.enemy.hp <= 0) { winBattle(); updateUI(); return; }
-
-    // --- AGI Re-Act Check (修正版) ---
-    // 敵のターンを呼ぶ前にチェックする！
-    // 基準: 敵Lv*2 (Lv10の敵ならAGI20でトントン、AGI50なら60%再行動)
-    const speedReq = g.enemy.lv * 2; 
-    const speedDiff = s.AGI - speedReq;
-    
-    if(speedDiff > 0) {
-        // 差分1につき2%の確率で再行動
-        const chance = speedDiff * 0.02;
-        if(Math.random() < chance) {
-            log(">>> 高速機動！再行動！(AGI)", "l-spd");
-            // enemyTurn() を呼ばずに終了（＝ずっと俺のターン）
+            log(`即死発動！！ ${g.enemy.name}を葬った！`,"l-kill");
+            g.enemy.hp = 0;
+            winBattle();
             updateUI();
-            return; 
+            return;
+        }
+        log("即死失敗... (1dmg)","l-gry");
+        applyDamageToEnemy(1, "即死ミス");
+    } else {
+        const hit = calcHit(sk.acc, sk.type, s, sk.cap);
+        if(Math.random() > hit) {
+            log("ミス！", "l-gry");
+            if(g.isFocused) g.isFocused = false;
+        } else {
+            const result = resolvePlayerAttack(sk, s, false);
+            if(result.hexMod > 1.0) log("相性有利！", "l-grn");
+            else if(result.hexMod < 1.0) log("相性不利...", "l-red");
+            if(result.crit) log(`Critical! 貫通${Math.floor(result.defenseCut * 100)}%`, "l-red");
+            applyDamageToEnemy(result.damage, sk.name);
+            if(sk.id==='Mug') {
+                const items = Object.keys(ITEM_DATA).filter(k => k !== 'clock');
+                const it = items[Math.floor(Math.random()*items.length)];
+                if(g.items[it] < CONF.itemMax) { g.items[it]++; log(`盗んだ！${ITEM_DATA[it].name}`,"l-yel"); }
+                else log("盗んだが持てない", "l-gry");
+            }
+            if(g.isFocused) g.isFocused = false;
         }
     }
 
-    // 再行動できなければ敵のターン
+    if(g.enemy.hp <= 0) { winBattle(); updateUI(); return; }
     enemyTurn();
     updateUI();
 }
-
-// --- 修正箇所：enemyTurn (重複していたAGI判定を削除) ---
 function enemyTurn(guard=false) {
     if(g.gameOver || !g.enemy || g.enemy.hp<=0) return;
-    
+
     if(g.enemy.isStunned) {
-        log("敵は動けない...","l-grn");
+        log("敵は動けない..", "l-grn");
         g.enemy.isStunned = false;
         g.guardStance = 0;
         tickBattleTurns();
         return;
     }
-    
-    // ※ここにあった古いAGI判定は削除しました（actBattle側に統合）
 
     const s = getStats();
 
     if(g.isCharging) {
         g.isCharging = false;
-        let dmg = Math.floor(g.enemy.atk * 2.5);
+        const charged = buildEnemyAttack('atk', s, true);
+        let dmg = charged.damage;
+        if(charged.hexMod > 1.0) log("弱点を突かれた！", "l-red");
+
+        if(!g.guardStance && !g.parryActive) {
+            const evaChance = clamp(((s.AGI - charged.enemyStats.AGI) * 0.025) + (g.currentJob.bonus.eva || 0), 0, 0.95);
+            if(Math.random() < evaChance) {
+                const counterChance = clamp(((s.AGI - charged.enemyStats.AGI) * 0.025), 0, 0.95);
+                if(Math.random() < counterChance) {
+                    const counter = Math.floor(s.AGI * 0.5);
+                    log(`回避反撃(Sonic)! ${counter}dmg`,"l-spd");
+                    applyDamageToEnemy(counter, "Counter");
+                    if(g.enemy.hp<=0) { winBattle(); return; }
+                } else {
+                    log("回避！", "l-spd");
+                }
+                tickBattleTurns();
+                return;
+            }
+        }
+
         if(g.currentJob.bonus.def) dmg = Math.floor(dmg * g.currentJob.bonus.def);
-        
         if(g.guardStance === 2) { dmg = 0; log("完全防御！(0dmg)", "l-grn"); }
         else if(g.guardStance === 1) { dmg = Math.floor(dmg / 3); log("防御で軽減！", "l-grn"); }
-        else if(g.parryActive) { 
-            g.parryActive=false; 
-            const cut = 0.3 + Math.random()*0.7; 
-            const just = cut>0.95; 
-            let cutDmg = Math.floor(dmg * (1.0 - cut));
+        else if(g.parryActive) {
+            g.parryActive = false;
+            const cut = 0.3 + Math.random()*0.7;
+            const just = cut > 0.95;
+            dmg = Math.floor(dmg * (1.0 - cut));
             log(`Parry! 軽減${Math.floor(cut*100)}%`,"l-blu");
-            dmg = cutDmg;
-            if(just) { 
-                const counter = Math.floor(s.DEX*2); applyDamageToEnemy(counter, "JustParry"); log(`反撃！ ${counter}dmg`,"l-grn"); 
-                if(g.enemy.hp<=0){winBattle();return;} 
+            if(just) {
+                const counter = Math.floor(s.DEX * 2);
+                applyDamageToEnemy(counter, "JustParry");
+                if(g.enemy.hp<=0) { winBattle(); return; }
             }
         }
         applyDamage(dmg, true);
@@ -445,54 +536,66 @@ function enemyTurn(guard=false) {
     const act = acts[Math.floor(Math.random()*acts.length)];
 
     if(act === 'heal') {
-        let h = Math.floor(g.enemy.mhp * 0.15); g.enemy.hp = Math.min(g.enemy.mhp, g.enemy.hp + h);
-        log(`再生(+${h})`, "l-red"); g.guardStance = 0; tickBattleTurns(); return;
+        let h = Math.floor(g.enemy.mhp * 0.15);
+        g.enemy.hp = Math.min(g.enemy.mhp, g.enemy.hp + h);
+        log(`再生(+${h})`, "l-red");
+        g.guardStance = 0;
+        tickBattleTurns();
+        return;
     }
-    if(act === 'charge') { g.isCharging = true; log(`力を溜めている...！`,"l-chg"); g.guardStance = 0; tickBattleTurns(); return; }
-
-    // 通常回避判定
-    let eva = s.AGI*0.025; if(g.currentJob.bonus.eva) eva+=g.currentJob.bonus.eva;
-    if(act==='atk' && !g.guardStance && !g.parryActive && Math.random()<eva) { 
-        // Sonic Counter
-        const counter = Math.floor(s.AGI * 0.5);
-        log(`回避反撃(Sonic)! ${counter}dmg`,"l-spd");
-        applyDamageToEnemy(counter, "Counter");
-        if(g.enemy.hp<=0) winBattle();
-        
-        tickBattleTurns(); return; 
+    if(act === 'charge') {
+        g.isCharging = true;
+        log(`力を溜めている...！`,"l-chg");
+        g.guardStance = 0;
+        tickBattleTurns();
+        return;
     }
 
-        let dmg = 0;
-    if(act === 'mag') { dmg = Math.max(5, g.enemy.atk - Math.floor(s.MND/2)); log(`呪い！`,"l-dmg"); }
-    else { dmg = Math.max(1, g.enemy.atk - Math.floor(s.VIT/3)); }
+    const attack = buildEnemyAttack(act, s, false);
+    let dmg = attack.damage;
+    if(attack.hexMod > 1.0) log("弱点を突かれた！", "l-red");
 
-    const enemyAtkStat = g.enemy.attackStat || (act === 'mag' ? 'INT' : 'STR');
-    const playerDominant = getPlayerDominantStat(s);
-    const enemyHexMod = getHexMultiplier(enemyAtkStat, playerDominant);
-    dmg = Math.floor(dmg * enemyHexMod);
-    if(enemyHexMod > 1.0) log("弱点を突かれた！", "l-red");
-    
+    if(act === 'atk' && !g.guardStance && !g.parryActive) {
+        const evaChance = clamp(((s.AGI - attack.enemyStats.AGI) * 0.025) + (g.currentJob.bonus.eva || 0), 0, 0.95);
+        if(Math.random() < evaChance) {
+            const counterChance = clamp(((s.AGI - attack.enemyStats.AGI) * 0.025), 0, 0.95);
+            if(Math.random() < counterChance) {
+                const counter = Math.floor(s.AGI * 0.5);
+                log(`回避反撃(Sonic)! ${counter}dmg`,"l-spd");
+                applyDamageToEnemy(counter, "Counter");
+                if(g.enemy.hp<=0) { winBattle(); return; }
+            } else {
+                log("回避！", "l-spd");
+            }
+            tickBattleTurns();
+            return;
+        }
+    }
+
     if(g.currentJob.bonus.def && act==='atk') dmg = Math.floor(dmg * g.currentJob.bonus.def);
     if(guard && act==='atk') {
-         dmg = Math.floor(dmg/2);
-         log("防御！", "l-grn");
+        dmg = Math.floor(dmg/2);
+        log("防御！", "l-grn");
     }
-
     if(g.parryActive && act==='atk') {
         g.parryActive = false;
         const cut = 0.3 + Math.random()*0.7;
         const just = cut > 0.95;
-        const cutDmg = Math.floor(dmg * (1.0 - cut));
+        dmg = Math.floor(dmg * (1.0 - cut));
         log(`Parry! 軽減${Math.floor(cut*100)}%`,"l-blu");
-        dmg = cutDmg;
-        if(just) { const counter = Math.floor(s.DEX*2); g.enemy.hp -= counter; log(`反撃！ ${counter}dmg`,"l-grn"); if(g.enemy.hp<=0){winBattle();return;} }
+        if(just) {
+            const counter = Math.floor(s.DEX*2);
+            g.enemy.hp -= counter;
+            log(`反撃！ ${counter}dmg`,"l-grn");
+            if(g.enemy.hp<=0){winBattle();return;}
+        }
     }
 
+    if(act === 'mag') log(`呪い！`,"l-dmg");
     applyDamage(dmg);
     g.guardStance = 0;
     tickBattleTurns();
 }
-
 function applyDamageToEnemy(dmg, sourceName) {
     g.enemy.hp -= dmg;
     if(sourceName !== "Parry") log(`${sourceName}! ${dmg}dmg`, "l-blu"); 
@@ -651,12 +754,7 @@ function updateEncounter() {
         b.style.borderColor='#555';
         c.innerHTML = `<div class="en-desc">探索中...</div>`;
     }
-}        b.style.display='block'; b.style.borderColor='#ba0';
-        let i = g.chest.identified ? (g.chest.trap?"<span style='color:#f66'>罠あり</span>":"<span style='color:#6f6'>安全</span>") : "未鑑定";
-        c.innerHTML = `<div class="enc-wrap aura-chest"><div class="enemy-glyph">⌘</div><div class="enemy-meta"><span class="en-name" style="color:#fd0">Treasure Chest</span><span class="en-desc">状態: ${i}</span></div></div>`;
-    } else { b.style.display='none'; }
 }
-
 function renderItems() {
     const b = document.getElementById('item-belt'); b.innerHTML = "";
     for(let k in g.items) {
